@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'models/product_listing.dart';
 import 'models/user_model.dart';
+import 'provider/create_listing.dart';
+import 'services/listing_service.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -16,6 +19,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController(viewportFraction: 1);
+  final ListingService _listingService = ListingService();
   int _activeBanner = 0;
   int _navIndex = 0;
 
@@ -43,41 +47,6 @@ class _HomePageState extends State<HomePage> {
     _CategoryItem(label: 'Baby', icon: Icons.child_friendly_rounded),
   ];
 
-  final List<_ProductItem> _products = const [
-    _ProductItem(
-      title: 'Female Sexy Night Dress',
-      seller: 'Gifty Grace',
-      location: 'Spintex, Accra',
-      price: 'GHC150',
-      imageUrl:
-          'https://images.pexels.com/photos/15233101/pexels-photo-15233101.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ),
-    _ProductItem(
-      title: 'Skin Care Essentials',
-      seller: 'Jason Robert',
-      location: 'Campus Store',
-      price: 'GHC122',
-      imageUrl:
-          'https://images.pexels.com/photos/4465831/pexels-photo-4465831.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ),
-    _ProductItem(
-      title: 'Minimal White Tee',
-      seller: 'Campus Wear',
-      location: 'Hostel Block A',
-      price: 'GHC80',
-      imageUrl:
-          'https://images.pexels.com/photos/6311392/pexels-photo-6311392.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ),
-    _ProductItem(
-      title: 'Baby Soft Toy Set',
-      seller: 'Happy Nest',
-      location: 'Town Center',
-      price: 'GHC95',
-      imageUrl:
-          'https://images.pexels.com/photos/3933024/pexels-photo-3933024.jpeg?auto=compress&cs=tinysrgb&w=800',
-    ),
-  ];
-
   @override
   void dispose() {
     _bannerController.dispose();
@@ -89,32 +58,53 @@ class _HomePageState extends State<HomePage> {
     final userName = widget.user.fullName.trim().isEmpty
         ? 'UniMarket User'
         : widget.user.fullName.trim();
+    final normalizedRole = widget.user.role.trim().toLowerCase();
+    final isProvider = normalizedRole == 'provider';
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF4A3DE0),
-        foregroundColor: Colors.white,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: isProvider
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CreateListingPage(user: widget.user),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF4A3DE0),
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add_rounded, size: 32),
+            )
+          : null,
+      floatingActionButtonLocation: isProvider
+          ? FloatingActionButtonLocation.centerDocked
+          : null,
       bottomNavigationBar: BottomAppBar(
         color: Colors.white,
         surfaceTintColor: Colors.white,
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 10,
+        shape: isProvider ? const CircularNotchedRectangle() : null,
+        notchMargin: isProvider ? 10 : 0,
         child: SizedBox(
           height: 72,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _navItem(Icons.home_filled, 'Home', 0),
-              _navItem(Icons.storefront_outlined, 'Sell', 1),
-              const SizedBox(width: 40),
-              _navItem(Icons.favorite_border_rounded, 'Saved', 2),
-              _navItem(Icons.person_outline_rounded, 'Profile', 3),
+              _navItem(
+                isProvider
+                    ? Icons.storefront_outlined
+                    : Icons.receipt_long_outlined,
+                isProvider ? 'Sell' : 'Order',
+                1,
+              ),
+              if (isProvider) ...[
+                const SizedBox(width: 40),
+                _navItem(Icons.message_outlined, 'Message', 2),
+                _navItem(Icons.person_outline_rounded, 'Profile', 3),
+              ] else
+                _navItem(Icons.person_outline_rounded, 'Profile', 2),
             ],
           ),
         ),
@@ -377,94 +367,44 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 18),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _products.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.62,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 14,
-                ),
-                itemBuilder: (context, index) {
-                  final product = _products[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(10),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+              StreamBuilder<List<ProductListing>>(
+                stream: _listingService.watchListings(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const _ProductsStateCard(
+                      message: 'Failed to load listings from Firestore.',
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  final products = snapshot.data ?? const [];
+                  if (products.isEmpty) {
+                    return const _ProductsStateCard(
+                      message: 'No listings yet. Add the first item and it will appear here.',
+                    );
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: products.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.62,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 14,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: ClipRRect(
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
-                            child: Image.network(
-                              product.imageUrl,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.seller,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                product.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                product.price,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF2F65FF),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                product.location,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black45,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    itemBuilder: (context, index) {
+                      final product = products[index];
+                      return _ProductCard(product: product);
+                    },
                   );
                 },
               ),
@@ -556,22 +496,6 @@ class _CategoryItem {
   });
 }
 
-class _ProductItem {
-  final String title;
-  final String seller;
-  final String location;
-  final String price;
-  final String imageUrl;
-
-  const _ProductItem({
-    required this.title,
-    required this.seller,
-    required this.location,
-    required this.price,
-    required this.imageUrl,
-  });
-}
-
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool isActive;
@@ -594,6 +518,145 @@ class _FilterChip extends StatelessWidget {
         style: TextStyle(
           color: isActive ? Colors.white : Colors.black87,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductCard extends StatelessWidget {
+  final ProductListing product;
+
+  const _ProductCard({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(10),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+              child: product.primaryImage.isEmpty
+                  ? Container(
+                      width: double.infinity,
+                      color: const Color(0xFFF3F3F3),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Colors.black38,
+                        size: 32,
+                      ),
+                    )
+                  : Image.network(
+                      product.primaryImage,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: double.infinity,
+                          color: const Color(0xFFF3F3F3),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.black38,
+                            size: 32,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.sellerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  product.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${product.currency}${product.price.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF2F65FF),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  product.specificLocation.isNotEmpty
+                      ? '${product.location}, ${product.specificLocation}'
+                      : product.location,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductsStateCard extends StatelessWidget {
+  final String message;
+
+  const _ProductsStateCard({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        message,
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.black54,
+          height: 1.5,
         ),
       ),
     );
