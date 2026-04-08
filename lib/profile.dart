@@ -3,13 +3,12 @@ import 'package:flutter/material.dart';
 
 import 'models/user_model.dart';
 import 'message_list.dart';
+import 'my_favorites.dart';
 import 'provider/create_listing.dart';
 import 'provider/my_listings.dart';
 import 'provider/my_sales.dart';
 import 'signin.dart';
-import 'my_favorites.dart';
 import 'student/my_purchases.dart';
-
 
 class ProfilePage extends StatefulWidget {
   final User user;
@@ -32,6 +31,49 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const SignInPage()),
       (route) => false,
+    );
+  }
+
+  Future<_ProfileStats> _loadProfileStats() async {
+    final userId = widget.user.uid.trim();
+    final favouritesSnapshot = await FirebaseFirestore.instance
+        .collection('favorites')
+        .where('userId', isEqualTo: userId)
+        .get();
+    final favouritesCount = favouritesSnapshot.size;
+    const chatsCount = 0;
+
+    if (_isProvider) {
+      final listingsSnapshot = await FirebaseFirestore.instance
+          .collection('listings')
+          .get();
+      final listingsCount = listingsSnapshot.docs.where((doc) {
+        final data = doc.data();
+        final sellerId = ((data['sellerId'] as String?) ?? '').trim();
+        final ownerId = ((data['userId'] as String?) ?? '').trim();
+        return sellerId == userId || ownerId == userId;
+      }).length;
+      return _ProfileStats(
+        listings: listingsCount,
+        chats: chatsCount,
+        favourites: favouritesCount,
+        purchases: 0,
+        showListings: true,
+        showPurchases: false,
+      );
+    }
+
+    final purchasesSnapshot = await FirebaseFirestore.instance
+        .collection('orders')
+        .where('buyerId', isEqualTo: userId)
+        .get();
+    return _ProfileStats(
+      listings: 0,
+      chats: chatsCount,
+      favourites: favouritesCount,
+      purchases: purchasesSnapshot.size,
+      showListings: false,
+      showPurchases: true,
     );
   }
 
@@ -125,7 +167,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 _isProvider
                     ? Icons.storefront_outlined
                     : Icons.receipt_long_outlined,
-                _isProvider ? 'Sales' : 'Order',
+                _isProvider ? 'Mysales' : 'Order',
                 1,
               ),
               if (_isProvider) ...[
@@ -328,45 +370,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Future<_ProfileStats> _loadProfileStats() async {
-    final userId = widget.user.uid;
-    final favouritesSnapshot = await FirebaseFirestore.instance
-        .collection('favorites')
-        .where('userId', isEqualTo: userId)
-        .get();
-    final favouritesCount = favouritesSnapshot.size;
-    const chatsCount = 0;
-
-    if (_isProvider) {
-      final listingsSnapshot = await FirebaseFirestore.instance
-          .collection('listings')
-          .where('sellerId', isEqualTo: userId)
-          .get();
-      return _ProfileStats(
-        listings: listingsSnapshot.size,
-        chats: chatsCount,
-        favourites: favouritesCount,
-        purchases: 0,
-        showListings: true,
-        showPurchases: false,
-      );
-    }
-
-    final purchasesSnapshot = await FirebaseFirestore.instance
-        .collection('orders')
-        .where('buyerId', isEqualTo: userId)
-        .get();
-
-    return _ProfileStats(
-      listings: 0,
-      chats: chatsCount,
-      favourites: favouritesCount,
-      purchases: purchasesSnapshot.size,
-      showListings: false,
-      showPurchases: true,
-    );
-  }
-
   Widget _navItem(IconData icon, String label, int index) {
     final activeIndex = _isProvider ? 3 : 2;
     final isActive = activeIndex == index;
@@ -390,11 +393,9 @@ class _ProfilePageState extends State<ProfilePage> {
           );
           return;
         }
-        if (label == 'Sales') {
+        if (label == 'Mysales') {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MyListingsPage(user: widget.user),
-            ),
+            MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
           );
           return;
         }
@@ -450,9 +451,9 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
     if (title == 'My Sales') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)));
       return;
     }
   }

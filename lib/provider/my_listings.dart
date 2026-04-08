@@ -23,7 +23,6 @@ class _MyListingsPageState extends State<MyListingsPage> {
   Widget build(BuildContext context) {
     final listingsStream = FirebaseFirestore.instance
         .collection('listings')
-        .where('sellerId', isEqualTo: widget.user.uid)
         .snapshots();
     final soldOrdersStream = FirebaseFirestore.instance
         .collection('orders')
@@ -55,12 +54,25 @@ class _MyListingsPageState extends State<MyListingsPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          final ownerId = widget.user.uid.trim();
           final allListings = (listingsSnapshot.data?.docs ?? const [])
               .map((doc) {
+                final raw = doc.data();
                 final data = <String, dynamic>{
-                  ...doc.data(),
-                  'productId': (doc.data()['productId'] as String?) ?? doc.id,
+                  ...raw,
+                  'productId': (raw['productId'] as String?) ?? doc.id,
                 };
+
+                final sellerId =
+                    ((raw['sellerId'] as String?) ?? '').trim();
+                final userId = ((raw['userId'] as String?) ?? '').trim();
+                final isOwnedByCurrentUser =
+                    sellerId == ownerId || userId == ownerId;
+
+                if (!isOwnedByCurrentUser) {
+                  return null;
+                }
+
                 try {
                   return ProductListing.fromMap(data);
                 } catch (_) {

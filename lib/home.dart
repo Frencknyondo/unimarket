@@ -9,7 +9,7 @@ import 'services/favorites_service.dart';
 import 'message_list.dart';
 import 'profile.dart';
 import 'provider/create_listing.dart';
-import 'provider/my_listings.dart';
+import 'provider/my_sales.dart';
 import 'student/listing_details.dart';
 import 'student/my_purchases.dart';
 
@@ -103,7 +103,7 @@ class _HomePageState extends State<HomePage> {
                 isProvider
                     ? Icons.storefront_outlined
                     : Icons.receipt_long_outlined,
-                isProvider ? 'Sales' : 'Order',
+                isProvider ? 'Mysales' : 'Order',
                 1,
               ),
               if (isProvider) ...[
@@ -493,10 +493,10 @@ class _HomePageState extends State<HomePage> {
           );
           return;
         }
-        if (label == 'Sales') {
+        if (label == 'Mysales') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => MyListingsPage(user: widget.user),
+              builder: (_) => MySalesPage(user: widget.user),
             ),
           );
           return;
