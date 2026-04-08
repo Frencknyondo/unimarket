@@ -43,51 +43,72 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
     final contactMethod =
         _selectedContact == _ContactMethod.whatsapp ? 'WhatsApp' : 'In-App Messaging';
 
-    try {
-      final orderRef = FirebaseFirestore.instance.collection('orders').doc();
-      await orderRef.set({
-        'orderId': orderRef.id,
-        'productId': product.productId,
-        'productTitle': product.title.trim(),
-        'category': product.category.trim(),
-        'productDescription': product.description.trim(),
-        'location': product.location.trim(),
-        'specificLocation': product.specificLocation.trim(),
-        'video': product.video,
-        'primaryImage': product.primaryImage,
-        'images': product.images,
-        'price': product.price,
-        'currency': 'Tsh',
-        'buyerId': buyer.uid,
-        'buyerName': buyer.fullName.trim(),
-        'buyerEmail': buyer.email.trim().toLowerCase(),
-        'sellerId': product.sellerId,
-        'sellerName': product.sellerName.trim(),
-        'sellerEmail': product.sellerEmail.trim().toLowerCase(),
-        'paymentMethod': 'Cash on Delivery',
-        'deliveryOption': deliveryOption,
-        'deliveryFeeLabel': deliveryFeeLabel,
-        'contactMethod': contactMethod,
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      try {
+        final orderRef = FirebaseFirestore.instance.collection('orders').doc();
+        await orderRef.set({
+          'orderId': orderRef.id,
+          'productId': product.productId,
+          'productTitle': product.title.trim(),
+          'category': product.category.trim(),
+          'productDescription': product.description.trim(),
+          'location': product.location.trim(),
+          'specificLocation': product.specificLocation.trim(),
+          'video': product.video,
+          'primaryImage': product.primaryImage,
+          'images': product.images,
+          'price': product.price,
+          'currency': 'Tsh',
+          'buyerId': buyer.uid,
+          'buyerName': buyer.fullName.trim(),
+          'buyerEmail': buyer.email.trim().toLowerCase(),
+          'sellerId': product.sellerId,
+          'sellerName': product.sellerName.trim(),
+          'sellerEmail': product.sellerEmail.trim().toLowerCase(),
+          'paymentMethod': 'Cash on Delivery',
+          'deliveryOption': deliveryOption,
+          'deliveryFeeLabel': deliveryFeeLabel,
+          'contactMethod': contactMethod,
+          'status': 'pending',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => MyPurchasesPage(user: buyer)),
-        (route) => route.isFirst,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Purchase request submitted successfully.')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to submit purchase request.')),
-      );
-      setState(() => _isSubmitting = false);
-    }
+        if (!mounted) return;
+        
+        // Show success dialog with options
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Purchase Confirmed!'),
+            content: const Text('Your purchase request has been submitted successfully.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => MyPurchasesPage(user: buyer)),
+                    (route) => route.isFirst,
+                  );
+                },
+                child: const Text('Go to My Orders'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Go back to previous screen
+                },
+                child: const Text('Back to Home'),
+              ),
+            ],
+          ),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to submit purchase request.')),
+        );
+        setState(() => _isSubmitting = false);
+      }
   }
 
   @override

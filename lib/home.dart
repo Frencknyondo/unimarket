@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
+import 'services/favorites_service.dart';
 import 'message_list.dart';
 import 'profile.dart';
 import 'provider/create_listing.dart';
+import 'provider/my_listings.dart';
 import 'student/listing_details.dart';
+import 'student/my_purchases.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -100,7 +103,7 @@ class _HomePageState extends State<HomePage> {
                 isProvider
                     ? Icons.storefront_outlined
                     : Icons.receipt_long_outlined,
-                isProvider ? 'Sell' : 'Order',
+                isProvider ? 'Sales' : 'Order',
                 1,
               ),
               if (isProvider) ...[
@@ -474,10 +477,26 @@ class _HomePageState extends State<HomePage> {
           );
           return;
         }
-        if (label == 'Message') {
+         if (label == 'Message') {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const MessageListPage(),
+            ),
+          );
+          return;
+        }
+        if (label == 'Order') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MyPurchasesPage(user: widget.user),
+            ),
+          );
+          return;
+        }
+        if (label == 'Sales') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MyListingsPage(user: widget.user),
             ),
           );
           return;
@@ -577,8 +596,6 @@ class _ListingCard extends StatefulWidget {
 }
 
 class _ListingCardState extends State<_ListingCard> {
-  bool _isFavorite = false;
-
   String _formatPrice(double value) {
     final whole = value.round();
     return 'Tsh$whole';
@@ -655,21 +672,31 @@ class _ListingCardState extends State<_ListingCard> {
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _isFavorite = !_isFavorite;
-                          });
-                        },
-                        child: Icon(
-                          _isFavorite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: _isFavorite
-                              ? const Color(0xFFE53935)
-                              : const Color(0xFF8A8A8A),
-                          size: 20,
+                      StreamBuilder<bool>(
+                        stream: FavoritesService.isFavoriteStream(
+                          userId: widget.currentUser.uid,
+                          productId: product.productId,
                         ),
+                        builder: (context, snapshot) {
+                          final isFavorite = snapshot.data ?? false;
+                          return GestureDetector(
+                            onTap: () async {
+                              await FavoritesService.toggleFavorite(
+                                user: widget.currentUser,
+                                product: product,
+                              );
+                            },
+                            child: Icon(
+                              isFavorite
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: isFavorite
+                                  ? const Color(0xFFE53935)
+                                  : const Color(0xFF8A8A8A),
+                              size: 20,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

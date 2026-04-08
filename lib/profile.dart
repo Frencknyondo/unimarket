@@ -1,11 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'models/user_model.dart';
 import 'message_list.dart';
 import 'provider/create_listing.dart';
+import 'provider/my_listings.dart';
+import 'provider/my_sales.dart';
 import 'signin.dart';
+import 'my_favorites.dart';
 import 'student/my_purchases.dart';
-import 'student/my_sales.dart';
+
 
 class ProfilePage extends StatefulWidget {
   final User user;
@@ -18,6 +22,7 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _pushNotifications = false;
+  late final Future<_ProfileStats> _statsFuture = _loadProfileStats();
 
   bool get _isProvider => widget.user.role.trim().toLowerCase() == 'provider';
   bool get _isStudent => !_isProvider;
@@ -85,10 +90,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     ];
 
-    final stats = _isProvider
-        ? const _ProfileStats(listings: 1, chats: 0, favourites: 1, purchases: 0)
-        : const _ProfileStats(listings: 0, chats: 0, favourites: 1, purchases: 3);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
       floatingActionButton: _isProvider
@@ -106,8 +107,9 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Icon(Icons.add_rounded, size: 32),
             )
           : null,
-      floatingActionButtonLocation:
-          _isProvider ? FloatingActionButtonLocation.centerDocked : null,
+      floatingActionButtonLocation: _isProvider
+          ? FloatingActionButtonLocation.centerDocked
+          : null,
       bottomNavigationBar: BottomAppBar(
         color: Colors.white,
         surfaceTintColor: Colors.white,
@@ -123,7 +125,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 _isProvider
                     ? Icons.storefront_outlined
                     : Icons.receipt_long_outlined,
-                _isProvider ? 'Sell' : 'Order',
+                _isProvider ? 'Sales' : 'Order',
                 1,
               ),
               if (_isProvider) ...[
@@ -209,7 +211,30 @@ class _ProfilePageState extends State<ProfilePage> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    _StatsPanel(stats: stats),
+                    FutureBuilder<_ProfileStats>(
+                      future: _statsFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const SizedBox(
+                            height: 86,
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (snapshot.hasError || !snapshot.hasData) {
+                          return const SizedBox(
+                            height: 86,
+                            child: Center(
+                              child: Text(
+                                'Unable to load stats',
+                                style: TextStyle(color: Colors.black54),
+                              ),
+                            ),
+                          );
+                        }
+                        return _StatsPanel(stats: snapshot.data!);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -303,6 +328,45 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<_ProfileStats> _loadProfileStats() async {
+    final userId = widget.user.uid;
+    final favouritesSnapshot = await FirebaseFirestore.instance
+        .collection('favorites')
+        .where('userId', isEqualTo: userId)
+        .get();
+    final favouritesCount = favouritesSnapshot.size;
+    const chatsCount = 0;
+
+    if (_isProvider) {
+      final listingsSnapshot = await FirebaseFirestore.instance
+          .collection('listings')
+          .where('sellerId', isEqualTo: userId)
+          .get();
+      return _ProfileStats(
+        listings: listingsSnapshot.size,
+        chats: chatsCount,
+        favourites: favouritesCount,
+        purchases: 0,
+        showListings: true,
+        showPurchases: false,
+      );
+    }
+
+    final purchasesSnapshot = await FirebaseFirestore.instance
+        .collection('orders')
+        .where('buyerId', isEqualTo: userId)
+        .get();
+
+    return _ProfileStats(
+      listings: 0,
+      chats: chatsCount,
+      favourites: favouritesCount,
+      purchases: purchasesSnapshot.size,
+      showListings: false,
+      showPurchases: true,
+    );
+  }
+
   Widget _navItem(IconData icon, String label, int index) {
     final activeIndex = _isProvider ? 3 : 2;
     final isActive = activeIndex == index;
@@ -313,9 +377,23 @@ class _ProfilePageState extends State<ProfilePage> {
           return;
         }
         if (label == 'Message') {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const MessageListPage()));
+          return;
+        }
+        if (label == 'Order') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => const MessageListPage(),
+              builder: (_) => MyPurchasesPage(user: widget.user),
+            ),
+          );
+          return;
+        }
+        if (label == 'Sales') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MyListingsPage(user: widget.user),
             ),
           );
           return;
@@ -348,14 +426,26 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _onAccountItemTap(String title) {
     if (title == 'Messages') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const MessageListPage()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const MessageListPage()));
       return;
     }
     if (title == 'My Purchases') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => MyPurchasesPage(user: widget.user)),
+      );
+      return;
+    }
+    if (title == 'My Favourites') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => MyFavoritesPage(user: widget.user)),
+      );
+      return;
+    }
+    if (title == 'My Listings') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => MyListingsPage(user: widget.user)),
       );
       return;
     }
@@ -372,28 +462,20 @@ class _AccountItemTile extends StatelessWidget {
   final _MenuItem item;
   final VoidCallback onTap;
 
-  const _AccountItemTile({
-    required this.item,
-    required this.onTap,
-  });
+  const _AccountItemTile({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFF1F1F1)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFF1F1F1))),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         leading: Container(
           width: 42,
           height: 42,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: item.iconBg,
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: item.iconBg),
           child: Icon(item.icon, color: item.iconColor, size: 22),
         ),
         title: Text(
@@ -404,7 +486,10 @@ class _AccountItemTile extends StatelessWidget {
           item.subtitle,
           style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
         ),
-        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.black54),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: Colors.black54,
+        ),
         onTap: onTap,
       ),
     );
@@ -415,19 +500,13 @@ class _PlainPrefTile extends StatelessWidget {
   final String title;
   final IconData icon;
 
-  const _PlainPrefTile({
-    required this.title,
-    required this.icon,
-  });
+  const _PlainPrefTile({required this.title, required this.icon});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon, color: Colors.black54),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
       trailing: const Icon(Icons.chevron_right_rounded, color: Colors.black54),
       onTap: () {},
     );
@@ -467,20 +546,23 @@ class _StatsPanel extends StatelessWidget {
       );
     }
 
+    final cells = <Widget>[];
+    if (stats.showListings) {
+      cells.add(cell('${stats.listings}', 'Listings'));
+    }
+    cells.add(cell('${stats.chats}', 'Chats'));
+    cells.add(cell('${stats.favourites}', 'Favourites'));
+    if (stats.showPurchases) {
+      cells.add(cell('${stats.purchases}', 'Purchases'));
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F7F7),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
-        children: [
-          cell('${stats.listings}', 'Listings'),
-          cell('${stats.chats}', 'Chats'),
-          cell('${stats.favourites}', 'Favourites'),
-          cell('${stats.purchases}', 'Purchases'),
-        ],
-      ),
+      child: Row(children: cells),
     );
   }
 }
@@ -490,12 +572,16 @@ class _ProfileStats {
   final int chats;
   final int favourites;
   final int purchases;
+  final bool showListings;
+  final bool showPurchases;
 
   const _ProfileStats({
     required this.listings,
     required this.chats,
     required this.favourites,
     required this.purchases,
+    required this.showListings,
+    required this.showPurchases,
   });
 }
 

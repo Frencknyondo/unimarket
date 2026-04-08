@@ -15,11 +15,7 @@ class MyPurchasesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OrdersListPage(
-      title: 'My Purchases',
-      user: user,
-      buyerView: true,
-    );
+    return OrdersListPage(title: 'My Purchases', user: user, buyerView: true);
   }
 }
 
@@ -100,13 +96,11 @@ class _OrdersListBaseState extends State<OrdersListPage> {
   Widget build(BuildContext context) {
     final query = widget.buyerView
         ? FirebaseFirestore.instance
-            .collection('orders')
-            .where('buyerId', isEqualTo: widget.user.uid)
-            .orderBy('createdAt', descending: true)
+              .collection('orders')
+              .where('buyerId', isEqualTo: widget.user.uid)
         : FirebaseFirestore.instance
-            .collection('orders')
-            .where('sellerId', isEqualTo: widget.user.uid)
-            .orderBy('createdAt', descending: true);
+              .collection('orders')
+              .where('sellerId', isEqualTo: widget.user.uid);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
@@ -116,7 +110,10 @@ class _OrdersListBaseState extends State<OrdersListPage> {
         elevation: 0,
         title: Text(
           widget.title,
-          style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Colors.black87,
+          ),
         ),
         actions: [
           if (!widget.buyerView)
@@ -124,7 +121,10 @@ class _OrdersListBaseState extends State<OrdersListPage> {
               padding: const EdgeInsets.only(right: 12),
               child: FilledButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                icon: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 18,
+                ),
                 label: const Text('Wallet'),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF3B82F6),
@@ -155,22 +155,46 @@ class _OrdersListBaseState extends State<OrdersListPage> {
               stream: query.snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return const Center(child: Text('Failed to load orders'));
+                  return Center(
+                    child: Text('Failed to load orders: ${snapshot.error}'),
+                  );
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final orders = (snapshot.data?.docs ?? const [])
-                    .map((doc) => OrderModel.fromMap({'orderId': doc.id, ...doc.data()}))
+                final docs = snapshot.data?.docs ?? const [];
+
+                final orders = docs
+                    .map((doc) {
+                      final data = {'orderId': doc.id, ...doc.data()};
+                      try {
+                        return OrderModel.fromMap(data);
+                      } catch (e) {
+                        return null;
+                      }
+                    })
+                    .where((order) => order != null)
+                    .map((order) => order!)
                     .toList();
+
+                orders.sort((a, b) {
+                  final aDate =
+                      a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  final bDate =
+                      b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  return bDate.compareTo(aDate);
+                });
+
                 final filtered = _applyFilter(orders);
 
                 if (filtered.isEmpty) {
-                  return const Center(
+                  return Center(
                     child: Text(
-                      'No orders in this section',
-                      style: TextStyle(color: Colors.black54),
+                      widget.buyerView
+                          ? 'No purchase orders found. Make a purchase to see them here.'
+                          : 'No sales orders found.',
+                      style: const TextStyle(color: Colors.black54),
                     ),
                   );
                 }
@@ -183,7 +207,9 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                       0,
                       order.orderId.length >= 8 ? 8 : order.orderId.length,
                     );
-                    final secondName = widget.buyerView ? order.sellerName : order.buyerName;
+                    final secondName = widget.buyerView
+                        ? order.sellerName
+                        : order.buyerName;
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -196,15 +222,23 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.timelapse_rounded, color: Color(0xFF9CA3AF)),
+                              const Icon(
+                                Icons.timelapse_rounded,
+                                color: Color(0xFF9CA3AF),
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 '${widget.buyerView ? 'Purchase' : 'Sale'} #$orderNo',
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const Spacer(),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: _statusBg(order.status),
                                   borderRadius: BorderRadius.circular(12),
@@ -230,9 +264,14 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                   child: order.primaryImage.isEmpty
                                       ? Container(
                                           color: const Color(0xFFE5E7EB),
-                                          child: const Icon(Icons.image_not_supported_outlined),
+                                          child: const Icon(
+                                            Icons.image_not_supported_outlined,
+                                          ),
                                         )
-                                      : Image.network(order.primaryImage, fit: BoxFit.cover),
+                                      : Image.network(
+                                          order.primaryImage,
+                                          fit: BoxFit.cover,
+                                        ),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -240,7 +279,15 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(order.productTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                                    Text(
+                                      order.productTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                     Text(
                                       _formatMoney(order.price, order.currency),
                                       style: const TextStyle(
@@ -251,9 +298,16 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                     ),
                                     Text(
                                       '${widget.buyerView ? 'Seller' : 'Buyer'}: $secondName',
-                                      style: const TextStyle(color: Color(0xFF555555)),
+                                      style: const TextStyle(
+                                        color: Color(0xFF555555),
+                                      ),
                                     ),
-                                    Text(_formatDate(order.createdAt), style: const TextStyle(color: Color(0xFF777777))),
+                                    Text(
+                                      _formatDate(order.createdAt),
+                                      style: const TextStyle(
+                                        color: Color(0xFF777777),
+                                      ),
+                                    ),
                                     Text(
                                       'Payment: ${order.paymentMethod}',
                                       style: const TextStyle(
@@ -278,8 +332,15 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                                  label: Text(widget.buyerView ? 'Message Seller' : 'Message Buyer'),
+                                  icon: const Icon(
+                                    Icons.chat_bubble_outline_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    widget.buyerView
+                                        ? 'Message Seller'
+                                        : 'Message Buyer',
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -296,7 +357,10 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+                                  icon: const Icon(
+                                    Icons.remove_red_eye_outlined,
+                                    size: 18,
+                                  ),
                                   label: const Text('View Details'),
                                 ),
                               ),
@@ -305,7 +369,10 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                 Expanded(
                                   child: FilledButton.icon(
                                     onPressed: () => _showUpdateStatus(order),
-                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                    icon: const Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                    ),
                                     label: const Text('Update Status'),
                                   ),
                                 ),
@@ -330,26 +397,41 @@ class _OrdersListBaseState extends State<OrdersListPage> {
   Future<void> _showUpdateStatus(OrderModel order) async {
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (context) {
         final orderNo = order.orderId.substring(
           0,
           order.orderId.length >= 8 ? 8 : order.orderId.length,
         );
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Update Order Status', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-              Text('Order #$orderNo', style: const TextStyle(color: Color(0xFF666666))),
-              const SizedBox(height: 12),
-              _statusOption(order, 'pending'),
-              _statusOption(order, 'confirmed'),
-              _statusOption(order, 'completed'),
-              _statusOption(order, 'cancelled'),
-            ],
+        final maxHeight = MediaQuery.of(context).size.height * 0.75;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Update Order Status',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    'Order #$orderNo',
+                    style: const TextStyle(color: Color(0xFF666666)),
+                  ),
+                  const SizedBox(height: 12),
+                  _statusOption(order, 'pending'),
+                  _statusOption(order, 'confirmed'),
+                  _statusOption(order, 'completed'),
+                  _statusOption(order, 'cancelled'),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -363,10 +445,13 @@ class _OrdersListBaseState extends State<OrdersListPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          await FirebaseFirestore.instance.collection('orders').doc(order.orderId).update({
-            'status': status,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+          await FirebaseFirestore.instance
+              .collection('orders')
+              .doc(order.orderId)
+              .update({
+                'status': status,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
           if (!mounted) return;
           Navigator.of(context).pop();
         },
@@ -374,19 +459,28 @@ class _OrdersListBaseState extends State<OrdersListPage> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFEAF4FF) : const Color(0xFFF6F7F8),
+            color: isSelected
+                ? const Color(0xFFEAF4FF)
+                : const Color(0xFFF6F7F8),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
             children: [
               Icon(
-                isSelected ? Icons.check_circle_outline : Icons.radio_button_unchecked,
-                color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF9CA3AF),
+                isSelected
+                    ? Icons.check_circle_outline
+                    : Icons.radio_button_unchecked,
+                color: isSelected
+                    ? const Color(0xFF3B82F6)
+                    : const Color(0xFF9CA3AF),
               ),
               const SizedBox(width: 10),
               Text(
                 '${status[0].toUpperCase()}${status.substring(1)}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
