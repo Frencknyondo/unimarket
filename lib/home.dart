@@ -1,9 +1,14 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
+import 'message_list.dart';
+import 'profile.dart';
 import 'provider/create_listing.dart';
-import 'services/listing_service.dart';
+import 'student/listing_details.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -19,7 +24,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController(viewportFraction: 1);
-  final ListingService _listingService = ListingService();
   int _activeBanner = 0;
   int _navIndex = 0;
 
@@ -103,8 +107,10 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(width: 40),
                 _navItem(Icons.message_outlined, 'Message', 2),
                 _navItem(Icons.person_outline_rounded, 'Profile', 3),
-              ] else
+              ] else ...[
+                _navItem(Icons.message_outlined, 'Message', 1),
                 _navItem(Icons.person_outline_rounded, 'Profile', 2),
+              ],
             ],
           ),
         ),
@@ -367,12 +373,15 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 18),
-              StreamBuilder<List<ProductListing>>(
-                stream: _listingService.watchListings(),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('listings')
+                    .orderBy('createdAt', descending: true)
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return const _ProductsStateCard(
-                      message: 'Failed to load listings from Firestore.',
+                      message: 'Failed to load listings.',
                     );
                   }
 
@@ -383,17 +392,29 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
 
-                  final products = snapshot.data ?? const [];
-                  if (products.isEmpty) {
+                  final docs = snapshot.data?.docs ?? const [];
+                  final listings = docs
+                      .map((doc) {
+                        final map = <String, dynamic>{
+                          ...doc.data(),
+                          'productId': (doc.data()['productId'] as String?) ??
+                              doc.id,
+                        };
+                        return ProductListing.fromMap(map);
+                      })
+                      .where((item) => item.images.isNotEmpty || item.video != null)
+                      .toList();
+                  if (listings.isEmpty) {
                     return const _ProductsStateCard(
-                      message: 'No listings yet. Add the first item and it will appear here.',
+                      message:
+                          'No listings found yet. products and they will appear here.',
                     );
                   }
 
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: products.length,
+                    itemCount: listings.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -402,8 +423,10 @@ class _HomePageState extends State<HomePage> {
                       crossAxisSpacing: 14,
                     ),
                     itemBuilder: (context, index) {
-                      final product = products[index];
-                      return _ProductCard(product: product);
+                      return _ListingCard(
+                        product: listings[index],
+                        currentUser: widget.user,
+                      );
                     },
                   );
                 },
@@ -443,6 +466,22 @@ class _HomePageState extends State<HomePage> {
     final isActive = _navIndex == index;
     return InkWell(
       onTap: () {
+        if (label == 'Profile') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProfilePage(user: widget.user),
+            ),
+          );
+          return;
+        }
+        if (label == 'Message') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const MessageListPage(),
+            ),
+          );
+          return;
+        }
         setState(() {
           _navIndex = index;
         });
@@ -524,110 +563,356 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ListingCard extends StatefulWidget {
   final ProductListing product;
+  final User currentUser;
 
-  const _ProductCard({required this.product});
+  const _ListingCard({
+    required this.product,
+    required this.currentUser,
+  });
+
+  @override
+  State<_ListingCard> createState() => _ListingCardState();
+}
+
+class _ListingCardState extends State<_ListingCard> {
+  bool _isFavorite = false;
+
+  String _formatPrice(double value) {
+    final whole = value.round();
+    return 'Tsh$whole';
+  }
+
+  String _formatPostedTime(DateTime? createdAt) {
+    if (createdAt == null) return 'just now';
+    final now = DateTime.now();
+    final diff = now.difference(createdAt);
+
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}w ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
+    return '${(diff.inDays / 365).floor()}y ago';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(10),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
-              ),
-              child: product.primaryImage.isEmpty
-                  ? Container(
-                      width: double.infinity,
-                      color: const Color(0xFFF3F3F3),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.image_not_supported_outlined,
-                        color: Colors.black38,
-                        size: 32,
-                      ),
-                    )
-                  : Image.network(
-                      product.primaryImage,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: double.infinity,
-                          color: const Color(0xFFF3F3F3),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: Colors.black38,
-                            size: 32,
-                          ),
-                        );
-                      },
-                    ),
+    final product = widget.product;
+    final hasVideo = product.video?.trim().isNotEmpty == true;
+    final detailsLocation = product.specificLocation.trim().isEmpty
+        ? product.location.trim()
+        : '${product.location.trim()}, ${product.specificLocation.trim()}';
+
+    return GestureDetector(
+                      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ListingDetailsPage(
+              product: product,
+              currentUser: widget.currentUser,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F6F8),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ListingImageCarousel(images: product.images, hasVideo: hasVideo),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 10,
+                        backgroundColor: Color(0xFFE6E6E6),
+                        child: Icon(
+                          Icons.person,
+                          size: 12,
+                          color: Color(0xFF888888),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          product.sellerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF575757),
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isFavorite = !_isFavorite;
+                          });
+                        },
+                        child: Icon(
+                          _isFavorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: _isFavorite
+                              ? const Color(0xFFE53935)
+                              : const Color(0xFF8A8A8A),
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 8),
                 Text(
-                  product.sellerName,
+                  product.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D1D1D),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  product.description.trim().isEmpty
+                      ? 'No description'
+                      : product.description.trim(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  product.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
+                    color: Color(0xFF606060),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '${product.currency}${product.price.toStringAsFixed(0)}',
+                  _formatPrice(product.price),
                   style: const TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2F65FF),
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1E88E5),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  product.specificLocation.isNotEmpty
-                      ? '${product.location}, ${product.specificLocation}'
-                      : product.location,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black45,
+                if (hasVideo) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A3DE0),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.videocam_rounded,
+                          size: 14,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Video available',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        detailsLocation.isEmpty ? 'No location' : detailsLocation,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF4E4E4E),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _formatPostedTime(product.createdAt),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF8A8A8A),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    ),
+    );
+  }
+}
+
+class _ListingImageCarousel extends StatefulWidget {
+  final List<String> images;
+  final bool hasVideo;
+
+  const _ListingImageCarousel({
+    required this.images,
+    this.hasVideo = false,
+  });
+
+  @override
+  State<_ListingImageCarousel> createState() => _ListingImageCarouselState();
+}
+
+class _ListingImageCarouselState extends State<_ListingImageCarousel> {
+  late final PageController _pageController;
+  Timer? _timer;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _startAutoSlide();
+  }
+
+  void _startAutoSlide() {
+    if (widget.images.length < 2) return;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final next = (_index + 1) % widget.images.length;
+      _pageController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ListingImageCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.images.length != widget.images.length) {
+      _index = 0;
+      _startAutoSlide();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasNoImages = widget.images.isEmpty;
+
+    return SizedBox(
+      height: 155,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(18),
+            ),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: hasNoImages ? 1 : widget.images.length,
+              onPageChanged: (value) {
+                setState(() {
+                  _index = value;
+                });
+              },
+              itemBuilder: (context, index) {
+                if (hasNoImages) {
+                  return Container(
+                    color: const Color(0xFFE7E7E7),
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.play_circle_fill_rounded,
+                          size: 46,
+                          color: Color(0xFF4A3DE0),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Video only listing',
+                          style: TextStyle(
+                            color: Color(0xFF4A3DE0),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return Image.network(
+                  widget.images[index],
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: const Color(0xFFE7E7E7),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_rounded,
+                        color: Colors.black38,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(150),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                hasNoImages
+                    ? 'Video'
+                    : '${_index + 1}/${widget.images.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         ],

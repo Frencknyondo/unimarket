@@ -1,13 +1,7 @@
-import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:video_compress/video_compress.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/user_model.dart';
-import '../services/listing_service.dart';
 
 class CreateListingPage extends StatefulWidget {
   final User user;
@@ -19,15 +13,15 @@ class CreateListingPage extends StatefulWidget {
 }
 
 class _CreateListingPageState extends State<CreateListingPage> {
-  final _listingService = ListingService();
-  final _picker = ImagePicker();
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
   final _specificLocationController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  final _videoUrlController = TextEditingController();
 
-  final List<_SelectedImage> _selectedImages = [];
-  XFile? _selectedVideo;
+  final List<String> _imageUrls = [];
+  String? _videoUrl;
   bool _isSubmitting = false;
 
   String? _selectedCategory;
@@ -45,8 +39,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
       'Specific location at $_selectedLocation';
 
   bool get _isFormComplete {
-    return _selectedImages.isNotEmpty &&
-        _titleController.text.trim().isNotEmpty &&
+    return _titleController.text.trim().isNotEmpty &&
         _priceController.text.trim().isNotEmpty &&
         _selectedCategory != null &&
         _selectedLocation.trim().isNotEmpty &&
@@ -60,7 +53,13 @@ class _CreateListingPageState extends State<CreateListingPage> {
     _priceController.dispose();
     _specificLocationController.dispose();
     _descriptionController.dispose();
+    _imageUrlController.dispose();
+    _videoUrlController.dispose();
     super.dispose();
+  }
+
+  bool isValidUrl(String url) {
+    return Uri.tryParse(url)?.hasAbsolutePath ?? false;
   }
 
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
@@ -86,118 +85,94 @@ class _CreateListingPageState extends State<CreateListingPage> {
     );
   }
 
-  Future<void> _pickImages() async {
-    List<XFile> pickedFiles;
-    try {
-      pickedFiles = _isDesktopPlatform
-          ? await _picker.pickMultiImage()
-          : await _picker.pickMultiImage(imageQuality: 100);
-    } catch (_) {
-      if (!mounted) return;
-      await _showStatusCard(
-        title: 'Photo upload failed',
-        message: 'We could not prepare the selected photos. Try again.',
-      );
-      return;
-    }
-
-    if (pickedFiles.isEmpty) return;
-
-    final availableSlots = 3 - _selectedImages.length;
-    if (availableSlots <= 0) {
-      await _showStatusCard(
-        title: 'Photo limit reached',
-        message: 'You can upload up to 3 photos only.',
-      );
-      return;
-    }
-
-    final filesToUse = pickedFiles.take(availableSlots).toList();
-    if (filesToUse.length < pickedFiles.length && mounted) {
-      await _showStatusCard(
-        title: 'Only 3 photos allowed',
-        message: 'Extra photos were skipped because the limit is 3.',
-      );
-    }
-
-    _showLoadingCard('Preparing photos...');
-    try {
-      final selectedImages = <_SelectedImage>[];
-      for (final file in filesToUse) {
-        selectedImages.add(
-          _SelectedImage(
-            file: file,
-            previewBytes: await file.readAsBytes(),
+  void _addImageUrl() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Enter Image URL"),
+          content: TextField(
+            controller: _imageUrlController,
+            decoration: const InputDecoration(hintText: "https://example.com/image.jpg"),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                if (_imageUrls.length >= 3) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("You can add up to 3 image URLs.")),
+                  );
+                  return;
+                }
+
+                final url = _imageUrlController.text.trim();
+                if (url.isNotEmpty && isValidUrl(url)) {
+                  setState(() {
+                    _imageUrls.add(url);
+                  });
+                  _imageUrlController.clear();
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please enter a valid URL")),
+                  );
+                }
+              },
+              child: const Text("Add"),
+            ),
+          ],
         );
-      }
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      setState(() {
-        _selectedImages.addAll(selectedImages);
-      });
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      await _showStatusCard(
-        title: 'Photo upload failed',
-        message: 'We could not read the selected images. Try different photos.',
-      );
-    }
-  }
-
-  Future<void> _pickVideo() async {
-    final pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
-    if (pickedFile == null) return;
-
-    _showLoadingCard(kIsWeb ? 'Preparing video...' : 'Compressing video...');
-    try {
-      final preparedVideo = kIsWeb
-          ? pickedFile
-          : await _compressVideo(File(pickedFile.path));
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      setState(() {
-        _selectedVideo = preparedVideo;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
-      await _showStatusCard(
-        title: 'Video upload failed',
-        message: 'We could not prepare the selected video. Try another file.',
-      );
-    }
-  }
-
-  Future<XFile> _compressVideo(File videoFile) async {
-    await VideoCompress.deleteAllCache();
-    final info = await VideoCompress.compressVideo(
-      videoFile.path,
-      quality: VideoQuality.MediumQuality,
-      deleteOrigin: false,
-      includeAudio: true,
+      },
     );
+  }
 
-    final compressedPath = info?.file?.path;
-    if (compressedPath == null) {
-      throw Exception('Video compression failed');
-    }
-
-    final compressedFile = File(compressedPath);
-    final sizeInMb = await compressedFile.length() / (1024 * 1024);
-    if (sizeInMb > 5) {
-      throw Exception('Compressed video is larger than 5MB');
-    }
-
-    return XFile(compressedPath);
+  void _addVideoUrl() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Enter Video URL"),
+          content: TextField(
+            controller: _videoUrlController,
+            decoration: const InputDecoration(hintText: "https://example.com/video.mp4"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                final url = _videoUrlController.text.trim();
+                if (url.isEmpty || isValidUrl(url)) {
+                  setState(() {
+                    _videoUrl = url.isEmpty ? null : url;
+                  });
+                  _videoUrlController.clear();
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please enter a valid URL")),
+                  );
+                }
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _submitListing() async {
     if (!_isFormComplete) {
       await _showStatusCard(
         title: 'Incomplete form',
-        message: 'Please fill all required fields and add at least one photo.',
+        message: 'Please fill all required fields.',
       );
       return;
     }
@@ -211,36 +186,77 @@ class _CreateListingPageState extends State<CreateListingPage> {
       return;
     }
 
+    // Validate URLs
+    for (final url in _imageUrls) {
+      if (!isValidUrl(url)) {
+        await _showStatusCard(
+          title: 'Invalid Image URL',
+          message: 'One or more image URLs are invalid.',
+        );
+        return;
+      }
+    }
+    if (_videoUrl != null && !isValidUrl(_videoUrl!)) {
+      await _showStatusCard(
+        title: 'Invalid Video URL',
+        message: 'The video URL is invalid.',
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
-    _showLoadingCard('Processing listing...');
+    _showLoadingCard('Creating listing...');
 
-    final result = await _listingService.createListing(
-      seller: widget.user,
-      title: _titleController.text,
-      price: price,
-      category: _selectedCategory!,
-      location: _selectedLocation,
-      specificLocation: _specificLocationController.text,
-      description: _descriptionController.text,
-      images: _selectedImages.map((image) => image.file).toList(),
-      video: _selectedVideo,
-    );
+    try {
+      await FirebaseFirestore.instance.collection('listings').add({
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'price': price,
+        'currency': 'Tsh',
+        'category': _selectedCategory,
+        'location': _selectedLocation,
+        'specificLocation': _specificLocationController.text.trim(),
+        'imageUrls': _imageUrls,
+        'videoUrl': _videoUrl,
+        'sellerId': widget.user.uid,
+        'sellerName': widget.user.fullName,
+        'sellerEmail': widget.user.email,
+        'userId': widget.user.uid,
+        'createdAt': Timestamp.now(),
+      });
 
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pop();
-    setState(() {
-      _isSubmitting = false;
-    });
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() {
+        _isSubmitting = false;
+      });
 
-    await _showStatusCard(
-      title: result['success'] ? 'Success' : 'Upload failed',
-      message: result['message'] as String,
-    );
+      await _showStatusCard(
+        title: 'Success',
+        message: 'Your listing has been created successfully!',
+      );
 
-    if (result['success'] == true && mounted) {
-      Navigator.of(context).pop();
+      // Clear form
+      _titleController.clear();
+      _priceController.clear();
+      _specificLocationController.clear();
+      _descriptionController.clear();
+      _imageUrls.clear();
+      _videoUrl = null;
+      _selectedCategory = null;
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() {
+        _isSubmitting = false;
+      });
+      await _showStatusCard(
+        title: 'Error',
+        message: 'Failed to create listing. Please try again.',
+      );
     }
   }
 
@@ -304,14 +320,6 @@ class _CreateListingPageState extends State<CreateListingPage> {
     );
   }
 
-  String _fileName(XFile file) {
-    final normalizedPath = file.path.replaceAll('\\', '/');
-    return normalizedPath.split('/').last;
-  }
-
-  bool get _isDesktopPlatform =>
-      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
-
   @override
   Widget build(BuildContext context) {
     final buttonColor = _isFormComplete
@@ -350,46 +358,42 @@ class _CreateListingPageState extends State<CreateListingPage> {
                   Expanded(
                     child: _MediaPickerCard(
                       title: 'Photos',
-                      actionLabel: _selectedImages.isEmpty
+                      actionLabel: _imageUrls.isEmpty
                           ? 'Add Photos'
                           : 'Edit Photos',
-                      countLabel: '${_selectedImages.length}/3',
+                      countLabel: '${_imageUrls.length}/3',
                       icon: Icons.add_rounded,
-                      preview: _selectedImages.isEmpty
+                      preview: _imageUrls.isEmpty
                           ? null
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.memory(
-                                _selectedImages.first.previewBytes,
-                                height: 42,
-                                width: 42,
-                                fit: BoxFit.cover,
+                          : Text(
+                              '${_imageUrls.length} URL${_imageUrls.length > 1 ? 's' : ''}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
                               ),
                             ),
-                      onTap: _pickImages,
+                      onTap: _addImageUrl,
                     ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: _MediaPickerCard(
                       title: 'Video',
-                      actionLabel: _selectedVideo == null
+                      actionLabel: _videoUrl == null
                           ? 'Add Video'
                           : 'Change Video',
                       countLabel: '1',
                       icon: Icons.videocam_rounded,
-                      preview: _selectedVideo == null
+                      preview: _videoUrl == null
                           ? null
-                          : Text(
-                              _fileName(_selectedVideo!),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                          : const Text(
+                              '1 URL',
+                              style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
                               ),
                             ),
-                      onTap: _pickVideo,
+                      onTap: _addVideoUrl,
                     ),
                   ),
                 ],
@@ -535,16 +539,6 @@ class _CreateListingPageState extends State<CreateListingPage> {
       ),
     );
   }
-}
-
-class _SelectedImage {
-  final XFile file;
-  final Uint8List previewBytes;
-
-  const _SelectedImage({
-    required this.file,
-    required this.previewBytes,
-  });
 }
 
 class _MediaPickerCard extends StatelessWidget {

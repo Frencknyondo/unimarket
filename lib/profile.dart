@@ -1,0 +1,516 @@
+import 'package:flutter/material.dart';
+
+import 'models/user_model.dart';
+import 'message_list.dart';
+import 'provider/create_listing.dart';
+import 'signin.dart';
+import 'student/my_purchases.dart';
+import 'student/my_sales.dart';
+
+class ProfilePage extends StatefulWidget {
+  final User user;
+
+  const ProfilePage({super.key, required this.user});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  bool _pushNotifications = false;
+
+  bool get _isProvider => widget.user.role.trim().toLowerCase() == 'provider';
+  bool get _isStudent => !_isProvider;
+
+  Future<void> _signOut() async {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SignInPage()),
+      (route) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.user.fullName.trim().isEmpty
+        ? 'UniMarket User'
+        : widget.user.fullName.trim();
+    final email = widget.user.email.trim();
+
+    final accountItems = <_MenuItem>[
+      if (_isProvider)
+        const _MenuItem(
+          title: 'My Listings',
+          subtitle: 'Manage your listings',
+          icon: Icons.list_alt_rounded,
+          iconBg: Color(0xFFE7F2FF),
+          iconColor: Color(0xFF2F65FF),
+        ),
+      const _MenuItem(
+        title: 'My Favourites',
+        subtitle: 'Check your saved items',
+        icon: Icons.favorite_rounded,
+        iconBg: Color(0xFFEAF2FF),
+        iconColor: Color(0xFF3B82F6),
+      ),
+      const _MenuItem(
+        title: 'Messages',
+        subtitle: 'Chat with buyers & sellers',
+        icon: Icons.message_outlined,
+        iconBg: Color(0xFFF3EAFE),
+        iconColor: Color(0xFFA855F7),
+      ),
+      if (_isStudent)
+        const _MenuItem(
+          title: 'My Purchases',
+          subtitle: 'Manage your orders',
+          icon: Icons.shopping_cart_checkout_rounded,
+          iconBg: Color(0xFFE8F8EC),
+          iconColor: Color(0xFF22C55E),
+        ),
+      if (_isProvider)
+        const _MenuItem(
+          title: 'My Sales',
+          subtitle: 'Track your sold items',
+          icon: Icons.local_offer_outlined,
+          iconBg: Color(0xFFFFF3E5),
+          iconColor: Color(0xFFF59E0B),
+        ),
+      const _MenuItem(
+        title: 'Account Settings',
+        subtitle: 'Profile, security & preferences',
+        icon: Icons.manage_accounts_outlined,
+        iconBg: Color(0xFFFFF7E5),
+        iconColor: Color(0xFFEAB308),
+      ),
+    ];
+
+    final stats = _isProvider
+        ? const _ProfileStats(listings: 1, chats: 0, favourites: 1, purchases: 0)
+        : const _ProfileStats(listings: 0, chats: 0, favourites: 1, purchases: 3);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F5F7),
+      floatingActionButton: _isProvider
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CreateListingPage(user: widget.user),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF4A3DE0),
+              foregroundColor: Colors.white,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add_rounded, size: 32),
+            )
+          : null,
+      floatingActionButtonLocation:
+          _isProvider ? FloatingActionButtonLocation.centerDocked : null,
+      bottomNavigationBar: BottomAppBar(
+        color: Colors.white,
+        surfaceTintColor: Colors.white,
+        shape: _isProvider ? const CircularNotchedRectangle() : null,
+        notchMargin: _isProvider ? 10 : 0,
+        child: SizedBox(
+          height: 72,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _navItem(Icons.home_filled, 'Home', 0),
+              _navItem(
+                _isProvider
+                    ? Icons.storefront_outlined
+                    : Icons.receipt_long_outlined,
+                _isProvider ? 'Sell' : 'Order',
+                1,
+              ),
+              if (_isProvider) ...[
+                const SizedBox(width: 40),
+                _navItem(Icons.message_outlined, 'Message', 2),
+                _navItem(Icons.person_outline_rounded, 'Profile', 3),
+              ] else ...[
+                _navItem(Icons.message_outlined, 'Message', 1),
+                _navItem(Icons.person_outline_rounded, 'Profile', 2),
+              ],
+            ],
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(10),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const CircleAvatar(
+                          radius: 32,
+                          backgroundColor: Color(0xFFF0F0F0),
+                          child: Icon(
+                            Icons.person,
+                            color: Color(0xFFB5B5B5),
+                            size: 36,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 33,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xFF5C5C5C),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Member since ${widget.user.createdAt.year}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF8A8A8A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _StatsPanel(stats: stats),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'My Account',
+                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: accountItems
+                      .map(
+                        (item) => _AccountItemTile(
+                          item: item,
+                          onTap: () => _onAccountItemTap(item.title),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Preferences',
+                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: _pushNotifications,
+                      onChanged: (value) {
+                        setState(() {
+                          _pushNotifications = value;
+                        });
+                      },
+                      activeThumbColor: Colors.white,
+                      activeTrackColor: const Color(0xFF2F65FF),
+                      title: const Text(
+                        'Push Notifications',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      secondary: const Icon(Icons.notifications_none_rounded),
+                    ),
+                    const Divider(height: 1),
+                    const _PlainPrefTile(
+                      title: 'Privacy & Security',
+                      icon: Icons.security_outlined,
+                    ),
+                    const Divider(height: 1),
+                    const _PlainPrefTile(
+                      title: 'Help & Support',
+                      icon: Icons.help_outline_rounded,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _signOut,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text(
+                    'Sign Out',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFFDA4AF)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int index) {
+    final activeIndex = _isProvider ? 3 : 2;
+    final isActive = activeIndex == index;
+    return InkWell(
+      onTap: () {
+        if (label == 'Home') {
+          Navigator.of(context).pop();
+          return;
+        }
+        if (label == 'Message') {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const MessageListPage(),
+            ),
+          );
+          return;
+        }
+        return;
+      },
+      child: SizedBox(
+        width: 64,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onAccountItemTap(String title) {
+    if (title == 'Messages') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const MessageListPage()),
+      );
+      return;
+    }
+    if (title == 'My Purchases') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => MyPurchasesPage(user: widget.user)),
+      );
+      return;
+    }
+    if (title == 'My Sales') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
+      );
+      return;
+    }
+  }
+}
+
+class _AccountItemTile extends StatelessWidget {
+  final _MenuItem item;
+  final VoidCallback onTap;
+
+  const _AccountItemTile({
+    required this.item,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFF1F1F1)),
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: item.iconBg,
+          ),
+          child: Icon(item.icon, color: item.iconColor, size: 22),
+        ),
+        title: Text(
+          item.title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        subtitle: Text(
+          item.subtitle,
+          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded, color: Colors.black54),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _PlainPrefTile extends StatelessWidget {
+  final String title;
+  final IconData icon;
+
+  const _PlainPrefTile({
+    required this.title,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.black54),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded, color: Colors.black54),
+      onTap: () {},
+    );
+  }
+}
+
+class _StatsPanel extends StatelessWidget {
+  final _ProfileStats stats;
+
+  const _StatsPanel({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget cell(String value, String label) {
+      return Expanded(
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 20,
+                color: Color(0xFF2F65FF),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF5A5A5A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          cell('${stats.listings}', 'Listings'),
+          cell('${stats.chats}', 'Chats'),
+          cell('${stats.favourites}', 'Favourites'),
+          cell('${stats.purchases}', 'Purchases'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileStats {
+  final int listings;
+  final int chats;
+  final int favourites;
+  final int purchases;
+
+  const _ProfileStats({
+    required this.listings,
+    required this.chats,
+    required this.favourites,
+    required this.purchases,
+  });
+}
+
+class _MenuItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+
+  const _MenuItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+  });
+}

@@ -36,12 +36,12 @@ class ProductListing {
   String get primaryImage => images.isNotEmpty ? images.first : '';
 
   factory ProductListing.fromMap(Map<String, dynamic> map) {
-    final imageList = map['images'];
+    final imageList = map['images'] ?? map['imageUrls'];
     final timestamp = map['createdAt'];
 
     return ProductListing(
       productId: map['productId'] as String? ?? '',
-      sellerId: map['sellerId'] as String? ?? '',
+      sellerId: (map['sellerId'] as String?) ?? (map['userId'] as String?) ?? '',
       sellerName: map['sellerName'] as String? ?? 'Unknown seller',
       sellerEmail: map['sellerEmail'] as String? ?? '',
       title: map['title'] as String? ?? '',
@@ -54,7 +54,7 @@ class ProductListing {
       images: imageList is List
           ? imageList.whereType<String>().where((item) => item.isNotEmpty).toList()
           : const [],
-      video: map['video'] as String?,
+      video: map['video'] as String? ?? map['videoUrl'] as String?,
       createdAt: timestamp is Timestamp ? timestamp.toDate() : null,
     );
   }
