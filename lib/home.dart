@@ -414,21 +414,27 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
 
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: listings.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.62,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 14,
-                    ),
-                    itemBuilder: (context, index) {
-                      return _ListingCard(
-                        product: listings[index],
-                        currentUser: widget.user,
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isCompactPhone = constraints.maxWidth < 380;
+
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: listings.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: isCompactPhone ? 0.58 : 0.62,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 14,
+                        ),
+                        itemBuilder: (context, index) {
+                          return _ListingCard(
+                            product: listings[index],
+                            currentUser: widget.user,
+                            compactLayout: isCompactPhone,
+                          );
+                        },
                       );
                     },
                   );
@@ -585,10 +591,12 @@ class _FilterChip extends StatelessWidget {
 class _ListingCard extends StatefulWidget {
   final ProductListing product;
   final User currentUser;
+  final bool compactLayout;
 
   const _ListingCard({
     required this.product,
     required this.currentUser,
+    this.compactLayout = false,
   });
 
   @override
@@ -618,6 +626,7 @@ class _ListingCardState extends State<_ListingCard> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final compactLayout = widget.compactLayout;
     final hasVideo = product.video?.trim().isNotEmpty == true;
     final detailsLocation = product.specificLocation.trim().isEmpty
         ? product.location.trim()
@@ -642,31 +651,40 @@ class _ListingCardState extends State<_ListingCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ListingImageCarousel(images: product.images, hasVideo: hasVideo),
+            _ListingImageCarousel(
+              images: product.images,
+              hasVideo: hasVideo,
+              compactLayout: compactLayout,
+            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              padding: EdgeInsets.fromLTRB(
+                compactLayout ? 8 : 10,
+                compactLayout ? 8 : 10,
+                compactLayout ? 8 : 10,
+                compactLayout ? 8 : 10,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const CircleAvatar(
-                        radius: 10,
+                      CircleAvatar(
+                        radius: compactLayout ? 9 : 10,
                         backgroundColor: Color(0xFFE6E6E6),
                         child: Icon(
                           Icons.person,
-                          size: 12,
+                          size: compactLayout ? 11 : 12,
                           color: Color(0xFF888888),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: compactLayout ? 4 : 6),
                       Expanded(
                         child: Text(
                           product.sellerName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13,
+                          style: TextStyle(
+                            fontSize: compactLayout ? 12 : 13,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF575757),
                           ),
@@ -693,51 +711,51 @@ class _ListingCardState extends State<_ListingCard> {
                               color: isFavorite
                                   ? const Color(0xFFE53935)
                                   : const Color(0xFF8A8A8A),
-                              size: 20,
+                              size: compactLayout ? 18 : 20,
                             ),
                           );
                         },
                       ),
                     ],
                   ),
-                const SizedBox(height: 8),
+                SizedBox(height: compactLayout ? 6 : 8),
                 Text(
                   product.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
+                  style: TextStyle(
+                    fontSize: compactLayout ? 15 : 17,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1D1D1D),
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: compactLayout ? 2 : 4),
                 Text(
                   product.description.trim().isEmpty
                       ? 'No description'
                       : product.description.trim(),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: compactLayout ? 12 : 13,
                     color: Color(0xFF606060),
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: compactLayout ? 6 : 8),
                 Text(
                   _formatPrice(product.price),
-                  style: const TextStyle(
-                    fontSize: 18,
+                  style: TextStyle(
+                    fontSize: compactLayout ? 16 : 18,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF1E88E5),
                   ),
                 ),
                 if (hasVideo) ...[
-                  const SizedBox(height: 6),
+                  SizedBox(height: compactLayout ? 4 : 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compactLayout ? 8 : 10,
+                      vertical: compactLayout ? 5 : 6,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4A3DE0),
@@ -745,18 +763,18 @@ class _ListingCardState extends State<_ListingCard> {
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      children: const [
+                      children: [
                         Icon(
                           Icons.videocam_rounded,
-                          size: 14,
+                          size: compactLayout ? 12 : 14,
                           color: Colors.white,
                         ),
-                        SizedBox(width: 6),
+                        SizedBox(width: compactLayout ? 4 : 6),
                         Text(
                           'Video available',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: compactLayout ? 10 : 11,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -764,7 +782,7 @@ class _ListingCardState extends State<_ListingCard> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 4),
+                SizedBox(height: compactLayout ? 2 : 4),
                 Row(
                   children: [
                     Expanded(
@@ -772,19 +790,19 @@ class _ListingCardState extends State<_ListingCard> {
                         detailsLocation.isEmpty ? 'No location' : detailsLocation,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
+                        style: TextStyle(
+                          fontSize: compactLayout ? 12 : 13,
                           color: Color(0xFF4E4E4E),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: compactLayout ? 4 : 6),
                     Text(
                       _formatPostedTime(product.createdAt),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 12,
+                      style: TextStyle(
+                        fontSize: compactLayout ? 11 : 12,
                         color: Color(0xFF8A8A8A),
                         fontWeight: FontWeight.w600,
                       ),
@@ -804,10 +822,12 @@ class _ListingCardState extends State<_ListingCard> {
 class _ListingImageCarousel extends StatefulWidget {
   final List<String> images;
   final bool hasVideo;
+  final bool compactLayout;
 
   const _ListingImageCarousel({
     required this.images,
     this.hasVideo = false,
+    this.compactLayout = false,
   });
 
   @override
@@ -861,7 +881,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
     final hasNoImages = widget.images.isEmpty;
 
     return SizedBox(
-      height: 155,
+      height: widget.compactLayout ? 140 : 155,
       child: Stack(
         children: [
           ClipRRect(
