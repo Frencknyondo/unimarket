@@ -382,7 +382,11 @@ class _ProfilePageState extends State<ProfilePage> {
         if (label == 'Message') {
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const MessageListPage()));
+          ).push(
+            MaterialPageRoute(
+              builder: (_) => MessageListPage(currentUser: widget.user),
+            ),
+          );
           return;
         }
         if (label == 'Order') {
@@ -429,7 +433,11 @@ class _ProfilePageState extends State<ProfilePage> {
     if (title == 'Messages') {
       Navigator.of(
         context,
-      ).push(MaterialPageRoute(builder: (_) => const MessageListPage()));
+      ).push(
+        MaterialPageRoute(
+          builder: (_) => MessageListPage(currentUser: widget.user),
+        ),
+      );
       return;
     }
     if (title == 'My Purchases') {

@@ -16,22 +16,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   final List<_OnboardingItem> _items = const [
     _OnboardingItem(
-      title: 'Dive Into A Hassle-Free Shopping Experience',
-      description:
-          'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-      icon: Icons.shopping_bag_outlined,
+      title: 'Welcome to UniMarketplace',
+      description: 'Buy, sell, and find services around your campus.',
+      imagePath: 'assets/onbording1.png',
     ),
     _OnboardingItem(
-      title: 'Find All You Need Online, Explore & Easy',
-      description:
-          'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-      icon: Icons.search_outlined,
+      title: 'Buy & Sell Easily',
+      description: 'Find food, Stationary, Clothes, and more from providers.',
+      imagePath: 'assets/onboarding2.png',
     ),
     _OnboardingItem(
-      title: 'Dive Into A World Of Convenience',
+      title: 'Get Services Fast',
       description:
-          'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-      icon: Icons.payments_outlined,
+          'Printing, Design, Repairs, and Delivery — all in one place.',
+      imagePath: 'assets/onboarding3.png',
     ),
   ];
 
@@ -172,12 +170,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
 class _OnboardingItem {
   final String title;
   final String description;
-  final IconData icon;
+  final String imagePath;
 
   const _OnboardingItem({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.imagePath,
   });
 }
 
@@ -200,12 +198,12 @@ class _OnboardingSlide extends StatelessWidget {
               color: const Color(0xFFF4F6FF),
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Center(
-              child: Icon(
-                item.icon,
-                size: 140,
-                color: const Color(0xFF2F65FF),
-              ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.asset(
+              item.imagePath,
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(height: 36),

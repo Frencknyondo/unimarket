@@ -328,7 +328,26 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                   onPressed: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => const MessageListPage(),
+                                        builder: (_) => MessageListPage(
+                                          currentUser: widget.user,
+                                          initialPeer: User(
+                                            uid: widget.buyerView
+                                                ? order.sellerId
+                                                : order.buyerId,
+                                            registrationNo: '',
+                                            email: widget.buyerView
+                                                ? order.sellerEmail
+                                                : order.buyerEmail,
+                                            fullName: widget.buyerView
+                                                ? order.sellerName
+                                                : order.buyerName,
+                                            password: '',
+                                            role: widget.buyerView
+                                                ? 'provider'
+                                                : 'student',
+                                            createdAt: DateTime.now(),
+                                          ),
+                                        ),
                                       ),
                                     );
                                   },

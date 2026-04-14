@@ -225,7 +225,24 @@ class OrderDetailsPage extends StatelessWidget {
                   IconButton(
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const MessageListPage()),
+                        MaterialPageRoute(
+                          builder: (_) => MessageListPage(
+                            currentUser: currentUser,
+                            initialPeer: User(
+                              uid: isSellerView ? order.buyerId : order.sellerId,
+                              registrationNo: '',
+                              email: isSellerView
+                                  ? order.buyerEmail
+                                  : order.sellerEmail,
+                              fullName: isSellerView
+                                  ? order.buyerName
+                                  : order.sellerName,
+                              password: '',
+                              role: isSellerView ? 'student' : 'provider',
+                              createdAt: DateTime.now(),
+                            ),
+                          ),
+                        ),
                       );
                     },
                     icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF3B82F6)),
@@ -313,7 +330,24 @@ class OrderDetailsPage extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const MessageListPage()),
+                    MaterialPageRoute(
+                      builder: (_) => MessageListPage(
+                        currentUser: currentUser,
+                        initialPeer: User(
+                          uid: isSellerView ? order.buyerId : order.sellerId,
+                          registrationNo: '',
+                          email: isSellerView
+                              ? order.buyerEmail
+                              : order.sellerEmail,
+                          fullName: isSellerView
+                              ? order.buyerName
+                              : order.sellerName,
+                          password: '',
+                          role: isSellerView ? 'student' : 'provider',
+                          createdAt: DateTime.now(),
+                        ),
+                      ),
+                    ),
                   );
                 },
                 icon: const Icon(Icons.chat_bubble_outline_rounded),

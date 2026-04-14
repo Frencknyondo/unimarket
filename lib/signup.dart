@@ -34,9 +34,9 @@ class _SignUpPageState extends State<SignUpPage> {
         _emailController.text.trim().isEmpty ||
         _registrationNoController.text.trim().isEmpty ||
         _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
@@ -62,13 +62,13 @@ class _SignUpPageState extends State<SignUpPage> {
     if (result['success']) {
       await _showSuccessDialog();
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const SignInPage()),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const SignInPage()));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'])),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result['message'])));
     }
   }
 
@@ -80,9 +80,7 @@ class _SignUpPageState extends State<SignUpPage> {
         backgroundColor: Colors.white.withAlpha(235),
         elevation: 0,
         insetPadding: const EdgeInsets.symmetric(horizontal: 36),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
           child: Column(
@@ -147,10 +145,7 @@ class _SignUpPageState extends State<SignUpPage> {
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFF9E9E9E),
-        fontSize: 15,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
       filled: true,
       fillColor: const Color(0xFFF7F7F7),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -184,25 +179,6 @@ class _SignUpPageState extends State<SignUpPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF7F7F7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 18,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 26),
                 const Text(
                   'Sign Up',
@@ -215,7 +191,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Lorem Ipsum is simply dummy text\nprinting typesetting industry.',
+                  'Create an account to get started with Uni Marketplace',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -289,10 +265,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     const Expanded(
                       child: Text(
                         'I agree to the terms & conditions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.black87,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.black87),
                       ),
                     ),
                   ],
@@ -317,8 +290,9 @@ class _SignUpPageState extends State<SignUpPage> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -334,10 +308,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 const Row(
                   children: [
                     Expanded(
-                      child: Divider(
-                        color: Color(0xFFE4E4E4),
-                        thickness: 1.2,
-                      ),
+                      child: Divider(color: Color(0xFFE4E4E4), thickness: 1.2),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -350,10 +321,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                     ),
                     Expanded(
-                      child: Divider(
-                        color: Color(0xFFE4E4E4),
-                        thickness: 1.2,
-                      ),
+                      child: Divider(color: Color(0xFFE4E4E4), thickness: 1.2),
                     ),
                   ],
                 ),
@@ -362,7 +330,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     _NetworkSocialButton(
-                      imageUrl: 'https://img.icons8.com/color/96/google-logo.png',
+                      imageUrl:
+                          'https://img.icons8.com/color/96/google-logo.png',
                       fallbackLabel: 'G',
                       fallbackColor: Color(0xFFDB4437),
                     ),
@@ -381,17 +350,12 @@ class _SignUpPageState extends State<SignUpPage> {
                   children: [
                     const Text(
                       'Already Have An Account? ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
                     ),
                     GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SignInPage(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const SignInPage()),
                         );
                       },
                       child: const Text(
@@ -470,11 +434,7 @@ class _NetworkSocialButton extends StatelessWidget {
     return Center(
       child: Opacity(
         opacity: opacity,
-        child: Icon(
-          fallbackIcon,
-          color: fallbackColor,
-          size: 24,
-        ),
+        child: Icon(fallbackIcon, color: fallbackColor, size: 24),
       ),
     );
   }

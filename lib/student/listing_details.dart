@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../models/user_model.dart';
 import '../models/product_listing.dart';
@@ -132,10 +133,11 @@ class _ListingDetailsPageState extends State<ListingDetailsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Image Carousel
+                // Image / video preview carousel
                 _ListingImageCarousel(
                   images: product.images,
                   hasVideo: product.video?.trim().isNotEmpty == true,
+                  videoUrl: product.video,
                 ),
                 const SizedBox(height: 20),
                 Padding(
@@ -286,8 +288,18 @@ class _ListingDetailsPageState extends State<ListingDetailsPage> {
                                     onPressed: () {
                                       Navigator.of(context).push(
                                         MaterialPageRoute(
-                                          builder: (_) =>
-                                              const MessageListPage(),
+                                          builder: (_) => MessageListPage(
+                                            currentUser: widget.currentUser,
+                                            initialPeer: User(
+                                              uid: product.sellerId,
+                                              registrationNo: '',
+                                              email: product.sellerEmail,
+                                              fullName: product.sellerName,
+                                              password: '',
+                                              role: 'provider',
+                                              createdAt: DateTime.now(),
+                                            ),
+                                          ),
                                         ),
                                       );
                                     },
@@ -452,11 +464,104 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+class VideoPlayerPage extends StatefulWidget {
+  final String videoUrl;
+
+  const VideoPlayerPage({super.key, required this.videoUrl});
+
+  @override
+  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
+}
+
+class _VideoPlayerPageState extends State<VideoPlayerPage> {
+  late final VideoPlayerController _controller;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (!mounted) return;
+        setState(() {
+          _isInitialized = true;
+        });
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Video Preview'),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 1,
+      ),
+      backgroundColor: Colors.black,
+      body: Center(
+        child: _isInitialized
+            ? GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
+                  });
+                },
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AspectRatio(
+                      aspectRatio: _controller.value.aspectRatio,
+                      child: VideoPlayer(_controller),
+                    ),
+                    if (!_controller.value.isPlaying)
+                      const Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Colors.white70,
+                        size: 72,
+                      ),
+                  ],
+                ),
+              )
+            : const CircularProgressIndicator(color: Colors.white),
+      ),
+      floatingActionButton: _isInitialized
+          ? FloatingActionButton(
+              backgroundColor: const Color(0xFF4A3DE0),
+              onPressed: () {
+                setState(() {
+                  _controller.value.isPlaying
+                      ? _controller.pause()
+                      : _controller.play();
+                });
+              },
+              child: Icon(
+                _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
 class _ListingImageCarousel extends StatefulWidget {
   final List<String> images;
   final bool hasVideo;
+  final String? videoUrl;
 
-  const _ListingImageCarousel({required this.images, this.hasVideo = false});
+  const _ListingImageCarousel({
+    required this.images,
+    this.hasVideo = false,
+    this.videoUrl,
+  });
 
   @override
   State<_ListingImageCarousel> createState() => _ListingImageCarouselState();
@@ -467,6 +572,13 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   Timer? _timer;
   int _index = 0;
 
+  bool get _hasVideoPage =>
+      widget.hasVideo && widget.videoUrl?.trim().isNotEmpty == true;
+
+  int get _pageCount => widget.images.isEmpty
+      ? 1
+      : widget.images.length + (_hasVideoPage ? 1 : 0);
+
   @override
   void initState() {
     super.initState();
@@ -475,11 +587,11 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   }
 
   void _startAutoSlide() {
-    if (widget.images.length < 2) return;
+    if (_pageCount < 2) return;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
-      final next = (_index + 1) % widget.images.length;
+      final next = (_index + 1) % _pageCount;
       _pageController.animateToPage(
         next,
         duration: const Duration(milliseconds: 320),
@@ -491,7 +603,9 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   @override
   void didUpdateWidget(covariant _ListingImageCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.images.length != widget.images.length) {
+    if (oldWidget.images.length != widget.images.length ||
+        oldWidget.videoUrl != widget.videoUrl ||
+        oldWidget.hasVideo != widget.hasVideo) {
       _index = 0;
       _startAutoSlide();
     }
@@ -507,6 +621,8 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   @override
   Widget build(BuildContext context) {
     final hasNoImages = widget.images.isEmpty;
+    final showVideoPage = _hasVideoPage;
+    final itemCount = _pageCount;
 
     return SizedBox(
       height: 280,
@@ -514,7 +630,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
         children: [
           PageView.builder(
             controller: _pageController,
-            itemCount: hasNoImages ? 1 : widget.images.length,
+            itemCount: itemCount,
             onPageChanged: (value) {
               setState(() {
                 _index = value;
@@ -522,6 +638,10 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
             },
             itemBuilder: (context, index) {
               if (hasNoImages) {
+                if (showVideoPage) {
+                  return _buildVideoPreview(context);
+                }
+
                 return Container(
                   color: const Color(0xFFE7E7E7),
                   alignment: Alignment.center,
@@ -529,13 +649,13 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                     mainAxisSize: MainAxisSize.min,
                     children: const [
                       Icon(
-                        Icons.play_circle_fill_rounded,
+                        Icons.image_not_supported_rounded,
                         size: 56,
                         color: Color(0xFF4A3DE0),
                       ),
                       SizedBox(height: 12),
                       Text(
-                        'Video only listing',
+                        'No images available',
                         style: TextStyle(
                           color: Color(0xFF4A3DE0),
                           fontSize: 16,
@@ -547,22 +667,26 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                 );
               }
 
-              return Image.network(
-                widget.images[index],
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: const Color(0xFFE7E7E7),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.broken_image_rounded,
-                      color: Colors.black38,
-                      size: 44,
-                    ),
-                  );
-                },
-              );
+              if (index < widget.images.length) {
+                return Image.network(
+                  widget.images[index],
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: const Color(0xFFE7E7E7),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_rounded,
+                        color: Colors.black38,
+                        size: 44,
+                      ),
+                    );
+                  },
+                );
+              }
+
+              return _buildVideoPreview(context);
             },
           ),
           Positioned(
@@ -575,7 +699,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Text(
-                hasNoImages ? 'Video' : '${_index + 1}/${widget.images.length}',
+                '${_index + 1}/$itemCount',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -585,6 +709,57 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVideoPreview(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        if (widget.videoUrl?.trim().isNotEmpty == true) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  VideoPlayerPage(videoUrl: widget.videoUrl!.trim()),
+            ),
+          );
+        }
+      },
+      child: Container(
+        color: const Color(0xFFE7E7E7),
+        alignment: Alignment.center,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/icon.png',
+                fit: BoxFit.cover,
+                color: Colors.black12,
+                colorBlendMode: BlendMode.dstATop,
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(
+                  Icons.play_circle_fill_rounded,
+                  size: 70,
+                  color: Color(0xFF4A3DE0),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Play video',
+                  style: TextStyle(
+                    color: Color(0xFF4A3DE0),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -6,6 +6,8 @@ class User {
   final String password;
   final String role;
   final DateTime createdAt;
+  final bool isOnline;
+  final DateTime? lastSeenAt;
 
   User({
     required this.uid,
@@ -15,6 +17,8 @@ class User {
     required this.password,
     required this.role,
     required this.createdAt,
+    this.isOnline = false,
+    this.lastSeenAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,10 +30,14 @@ class User {
       'password': password,
       'role': role,
       'createdAt': createdAt.toIso8601String(),
+      'isOnline': isOnline,
+      'lastSeenAt': lastSeenAt?.toIso8601String(),
     };
   }
 
   factory User.fromMap(Map<String, dynamic> map) {
+    final rawLastSeen = map['lastSeenAt'];
+
     return User(
       uid: map['uid'] ?? '',
       registrationNo: map['registrationNo'] ?? '',
@@ -40,6 +48,12 @@ class User {
       createdAt: DateTime.parse(
         map['createdAt'] ?? DateTime.now().toIso8601String(),
       ),
+      isOnline: map['isOnline'] == true,
+      lastSeenAt: rawLastSeen == null
+          ? null
+          : rawLastSeen is String
+              ? DateTime.tryParse(rawLastSeen)
+              : rawLastSeen.toDate(),
     );
   }
 }

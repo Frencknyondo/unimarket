@@ -29,6 +29,8 @@ class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController(viewportFraction: 1);
   int _activeBanner = 0;
   int _navIndex = 0;
+  bool _showAllCategories = false;
+  String _selectedCategory = 'All';
 
   final List<_PromoBanner> _banners = const [
     _PromoBanner(
@@ -52,7 +54,25 @@ class _HomePageState extends State<HomePage> {
     _CategoryItem(label: 'Medicine', icon: Icons.medication_rounded),
     _CategoryItem(label: 'Beauty', icon: Icons.brush_rounded),
     _CategoryItem(label: 'Baby', icon: Icons.child_friendly_rounded),
+    _CategoryItem(label: 'Stationary', icon: Icons.menu_book_rounded),
+    _CategoryItem(label: 'Food', icon: Icons.fastfood_rounded),
   ];
+
+  List<_CategoryItem> get _visibleCategories => _showAllCategories
+      ? _categories
+      : _categories.take(4).toList();
+
+  String _normalizeCategory(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'stationery') return 'stationary';
+    return normalized;
+  }
+
+  bool _matchesSelectedCategory(ProductListing item) {
+    if (_selectedCategory == 'All') return true;
+    return _normalizeCategory(item.category) ==
+        _normalizeCategory(_selectedCategory);
+  }
 
   @override
   void dispose() {
@@ -325,38 +345,29 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 22),
-              _sectionHeader('Category'),
+              _sectionHeader(
+                'Category',
+                actionLabel: _showAllCategories ? 'See less' : 'See All',
+                onActionTap: () {
+                  setState(() {
+                    _showAllCategories = !_showAllCategories;
+                  });
+                },
+              ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: _categories
+              Wrap(
+                spacing: 10,
+                runSpacing: 16,
+                children: _visibleCategories
                     .map(
-                      (category) => Expanded(
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 62,
-                              height: 62,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFF7F7F7),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                category.icon,
-                                color: const Color(0xFF4A3DE0),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              category.label,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      (category) => _CategoryButton(
+                        category: category,
+                        isSelected: _selectedCategory == category.label,
+                        onTap: () {
+                          setState(() {
+                            _selectedCategory = category.label;
+                          });
+                        },
                       ),
                     )
                     .toList(),
@@ -364,16 +375,51 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 30),
               _sectionHeader('Just For You'),
               const SizedBox(height: 16),
-              Row(
-                children: const [
-                  _FilterChip(label: 'All', isActive: true),
-                  SizedBox(width: 10),
-                  _FilterChip(label: 'Popular'),
-                  SizedBox(width: 10),
-                  _FilterChip(label: 'Newest'),
-                  SizedBox(width: 10),
-                  _FilterChip(label: 'Best Sell'),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _FilterChip(
+                      label: 'All',
+                      isActive: _selectedCategory == 'All',
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = 'All';
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      label: 'Clothing',
+                      isActive: _selectedCategory == 'Clothing',
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = 'Clothing';
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      label: 'Food',
+                      isActive: _selectedCategory == 'Food',
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = 'Food';
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      label: 'Stationary',
+                      isActive: _selectedCategory == 'Stationary',
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = 'Stationary';
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 18),
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -414,6 +460,17 @@ class _HomePageState extends State<HomePage> {
                     );
                   }
 
+                  final filteredListings = listings
+                      .where(_matchesSelectedCategory)
+                      .toList();
+
+                  if (filteredListings.isEmpty) {
+                    final message = _selectedCategory == 'All'
+                        ? 'No listings found yet. Products will appear here soon.'
+                        : '$_selectedCategory listings are coming soon.';
+                    return _ProductsStateCard(message: message);
+                  }
+
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final isCompactPhone = constraints.maxWidth < 380;
@@ -421,7 +478,7 @@ class _HomePageState extends State<HomePage> {
                       return GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: listings.length,
+                        itemCount: filteredListings.length,
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           childAspectRatio: isCompactPhone ? 0.58 : 0.62,
@@ -430,7 +487,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         itemBuilder: (context, index) {
                           return _ListingCard(
-                            product: listings[index],
+                            product: filteredListings[index],
                             currentUser: widget.user,
                             compactLayout: isCompactPhone,
                           );
@@ -447,7 +504,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _sectionHeader(String title) {
+  Widget _sectionHeader(
+    String title, {
+    String? actionLabel,
+    VoidCallback? onActionTap,
+  }) {
     return Row(
       children: [
         Text(
@@ -458,15 +519,20 @@ class _HomePageState extends State<HomePage> {
             color: Colors.black87,
           ),
         ),
-        const Spacer(),
-        const Text(
-          'See All',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF6A5AE0),
+        if (actionLabel != null) ...[
+          const Spacer(),
+          GestureDetector(
+            onTap: onActionTap,
+            child: Text(
+              actionLabel,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6A5AE0),
+              ),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -483,10 +549,10 @@ class _HomePageState extends State<HomePage> {
           );
           return;
         }
-         if (label == 'Message') {
+        if (label == 'Message') {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => const MessageListPage(),
+              builder: (_) => MessageListPage(currentUser: widget.user),
             ),
           );
           return;
@@ -560,28 +626,83 @@ class _CategoryItem {
   });
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isActive;
+class _CategoryButton extends StatelessWidget {
+  final _CategoryItem category;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _FilterChip({
-    required this.label,
-    this.isActive = false,
+  const _CategoryButton({
+    required this.category,
+    required this.isSelected,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF4A3DE0) : const Color(0xFFF3F3F3),
-        borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 74,
+        child: Column(
+          children: [
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF4A3DE0)
+                    : const Color(0xFFF7F7F7),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                category.icon,
+                color: isSelected ? Colors.white : const Color(0xFF4A3DE0),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              category.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? const Color(0xFF4A3DE0) : Colors.black87,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isActive ? Colors.white : Colors.black87,
-          fontWeight: FontWeight.w700,
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback? onTap;
+
+  const _FilterChip({
+    required this.label,
+    this.isActive = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF4A3DE0) : const Color(0xFFF3F3F3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

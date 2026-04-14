@@ -27,10 +27,11 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Future<void> _signIn() async {
-    if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
       return;
     }
 
@@ -50,9 +51,9 @@ class _SignInPageState extends State<SignInPage> {
     if (result['success']) {
       final user = result['user'];
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User data not found')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('User data not found')));
         return;
       }
 
@@ -60,23 +61,20 @@ class _SignInPageState extends State<SignInPage> {
           ? const AdminDashboardPage()
           : HomePage(user: user);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => destination),
-      );
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => destination));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'])),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result['message'])));
     }
   }
 
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(
-        color: Color(0xFF9E9E9E),
-        fontSize: 15,
-      ),
+      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
       filled: true,
       fillColor: const Color(0xFFF7F7F7),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
@@ -110,25 +108,6 @@ class _SignInPageState extends State<SignInPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF7F7F7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 18,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 26),
                 const Text(
                   'Sign In',
@@ -141,7 +120,7 @@ class _SignInPageState extends State<SignInPage> {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Lorem Ipsum is simply dummy text\nprinting typesetting industry.',
+                  'Hi Welcome back, you\'ve been missed!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -216,8 +195,9 @@ class _SignInPageState extends State<SignInPage> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : const Text(
@@ -233,10 +213,7 @@ class _SignInPageState extends State<SignInPage> {
                 const Row(
                   children: [
                     Expanded(
-                      child: Divider(
-                        color: Color(0xFFE4E4E4),
-                        thickness: 1.2,
-                      ),
+                      child: Divider(color: Color(0xFFE4E4E4), thickness: 1.2),
                     ),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -249,10 +226,7 @@ class _SignInPageState extends State<SignInPage> {
                       ),
                     ),
                     Expanded(
-                      child: Divider(
-                        color: Color(0xFFE4E4E4),
-                        thickness: 1.2,
-                      ),
+                      child: Divider(color: Color(0xFFE4E4E4), thickness: 1.2),
                     ),
                   ],
                 ),
@@ -261,7 +235,8 @@ class _SignInPageState extends State<SignInPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
                     _NetworkSocialButton(
-                      imageUrl: 'https://img.icons8.com/color/96/google-logo.png',
+                      imageUrl:
+                          'https://img.icons8.com/color/96/google-logo.png',
                       fallbackLabel: 'G',
                       fallbackColor: Color(0xFFDB4437),
                     ),
@@ -280,17 +255,12 @@ class _SignInPageState extends State<SignInPage> {
                   children: [
                     const Text(
                       'Don\'t Have An Account? ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
                     ),
                     GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SignUpPage(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const SignUpPage()),
                         );
                       },
                       child: const Text(
@@ -369,11 +339,7 @@ class _NetworkSocialButton extends StatelessWidget {
     return Center(
       child: Opacity(
         opacity: opacity,
-        child: Icon(
-          fallbackIcon,
-          color: fallbackColor,
-          size: 24,
-        ),
+        child: Icon(fallbackIcon, color: fallbackColor, size: 24),
       ),
     );
   }
