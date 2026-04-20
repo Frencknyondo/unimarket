@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
 import 'services/favorites_service.dart';
+import 'services/notifications_service.dart';
 import 'message_list.dart';
 import 'profile.dart';
 import 'provider/create_listing.dart';
@@ -16,10 +17,7 @@ import 'student/my_purchases.dart';
 class HomePage extends StatefulWidget {
   final User user;
 
-  const HomePage({
-    super.key,
-    required this.user,
-  });
+  const HomePage({super.key, required this.user});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -27,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final PageController _bannerController = PageController(viewportFraction: 1);
+  final NotificationsService _notificationsService = NotificationsService();
   int _activeBanner = 0;
   int _navIndex = 0;
   bool _showAllCategories = false;
@@ -58,9 +57,8 @@ class _HomePageState extends State<HomePage> {
     _CategoryItem(label: 'Food', icon: Icons.fastfood_rounded),
   ];
 
-  List<_CategoryItem> get _visibleCategories => _showAllCategories
-      ? _categories
-      : _categories.take(4).toList();
+  List<_CategoryItem> get _visibleCategories =>
+      _showAllCategories ? _categories : _categories.take(4).toList();
 
   String _normalizeCategory(String value) {
     final normalized = value.trim().toLowerCase();
@@ -72,6 +70,21 @@ class _HomePageState extends State<HomePage> {
     if (_selectedCategory == 'All') return true;
     return _normalizeCategory(item.category) ==
         _normalizeCategory(_selectedCategory);
+  }
+
+  Future<void> _showNotificationsSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: const Color(0xFFF8FAFF),
+      builder: (context) {
+        return _NotificationsSheet(
+          user: widget.user,
+          notificationsService: _notificationsService,
+        );
+      },
+    );
   }
 
   @override
@@ -160,10 +173,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         const Text(
                           'Welcome back,',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: Colors.black54,
-                          ),
+                          style: TextStyle(fontSize: 15, color: Colors.black54),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -179,6 +189,69 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
+                  StreamBuilder<int>(
+                    stream: _notificationsService.unreadCountStream(
+                      widget.user.uid,
+                    ),
+                    builder: (context, snapshot) {
+                      final unreadCount = snapshot.data ?? 0;
+                      return InkWell(
+                        onTap: _showNotificationsSheet,
+                        borderRadius: BorderRadius.circular(999),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF7F7F7),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.notifications_active_outlined,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            if (unreadCount > 0)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF2563EB),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      unreadCount > 9 ? '9+' : '$unreadCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  // Search Icon - styled like notification icon
                   Container(
                     width: 48,
                     height: 48,
@@ -187,59 +260,15 @@ class _HomePageState extends State<HomePage> {
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
-                      Icons.notifications_active_outlined,
+                      Icons.search_rounded,
                       color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 52,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF7F7F7),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.search_rounded,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            'Search',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A3DE0),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.tune_rounded,
-                      color: Colors.white,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               SizedBox(
-                height: 148,
+                height: 180,
                 child: PageView.builder(
                   controller: _bannerController,
                   itemCount: _banners.length,
@@ -446,12 +475,14 @@ class _HomePageState extends State<HomePage> {
                       .map((doc) {
                         final map = <String, dynamic>{
                           ...doc.data(),
-                          'productId': (doc.data()['productId'] as String?) ??
-                              doc.id,
+                          'productId':
+                              (doc.data()['productId'] as String?) ?? doc.id,
                         };
                         return ProductListing.fromMap(map);
                       })
-                      .where((item) => item.images.isNotEmpty || item.video != null)
+                      .where(
+                        (item) => item.images.isNotEmpty || item.video != null,
+                      )
                       .toList();
                   if (listings.isEmpty) {
                     return const _ProductsStateCard(
@@ -543,9 +574,7 @@ class _HomePageState extends State<HomePage> {
       onTap: () {
         if (label == 'Profile') {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ProfilePage(user: widget.user),
-            ),
+            MaterialPageRoute(builder: (_) => ProfilePage(user: widget.user)),
           );
           return;
         }
@@ -567,9 +596,7 @@ class _HomePageState extends State<HomePage> {
         }
         if (label == 'Mysales') {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MySalesPage(user: widget.user),
-            ),
+            MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
           );
           return;
         }
@@ -602,6 +629,334 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _NotificationsSheet extends StatelessWidget {
+  final User user;
+  final NotificationsService notificationsService;
+
+  const _NotificationsSheet({
+    required this.user,
+    required this.notificationsService,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.86;
+
+    return SafeArea(
+      child: SizedBox(
+        height: maxHeight,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Notifications',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        notificationsService.markAllAsRead(user.uid),
+                    child: const Text(
+                      'Mark all read',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: StreamBuilder<List<AppNotification>>(
+                  stream: notificationsService.notificationsStream(user.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const _NotificationEmptyState(
+                        title: 'Notifications unavailable',
+                        subtitle:
+                            'Failed to load your notifications right now.',
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final notifications =
+                        snapshot.data ?? const <AppNotification>[];
+                    final unreadCount = notifications
+                        .where((item) => !item.isRead)
+                        .length;
+
+                    if (notifications.isEmpty) {
+                      return const _NotificationEmptyState(
+                        title: 'No notifications yet',
+                        subtitle:
+                            'Notifications from admin and order updates will appear here.',
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEAF2FF),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            unreadCount == 1
+                                ? '1 unread notification'
+                                : '$unreadCount unread notifications',
+                            style: const TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Expanded(
+                          child: ListView.separated(
+                            itemCount: notifications.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final item = notifications[index];
+                              return _NotificationTile(
+                                notification: item,
+                                onTap: () =>
+                                    notificationsService.markAsRead(item.id),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  final AppNotification notification;
+  final VoidCallback onTap;
+
+  const _NotificationTile({required this.notification, required this.onTap});
+
+  IconData _iconForType() {
+    switch (notification.type) {
+      case 'order_confirmed':
+        return Icons.verified_rounded;
+      case 'order_received':
+        return Icons.shopping_cart_checkout_rounded;
+      case 'listing_created':
+        return Icons.campaign_rounded;
+      default:
+        return Icons.notifications_active_rounded;
+    }
+  }
+
+  Color _iconColor() {
+    switch (notification.type) {
+      case 'order_confirmed':
+        return const Color(0xFFF59E0B);
+      case 'order_received':
+        return const Color(0xFF2563EB);
+      case 'listing_created':
+        return const Color(0xFFA855F7);
+      default:
+        return const Color(0xFF4A3DE0);
+    }
+  }
+
+  String _timeAgo(DateTime? dateTime) {
+    if (dateTime == null) return 'Just now';
+    final diff = DateTime.now().difference(dateTime);
+
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
+    if (diff.inDays < 1) return '${diff.inHours} hrs ago';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()} weeks ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()} months ago';
+    return '${(diff.inDays / 365).floor()} years ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = _iconColor();
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: notification.isRead
+                  ? const Color(0xFFF1F5F9)
+                  : const Color(0xFFD6E4FF),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x120F172A),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: iconColor.withAlpha(20),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(_iconForType(), color: iconColor),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notification.title,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.message,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.4,
+                        color: Color(0xFF4B5563),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _timeAgo(notification.createdAt),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF9CA3AF),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!notification.isRead)
+                Container(
+                  width: 10,
+                  height: 10,
+                  margin: const EdgeInsets.only(top: 6, left: 8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF3B82F6),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationEmptyState extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _NotificationEmptyState({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120F172A),
+              blurRadius: 28,
+              offset: Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEAF2FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.notifications_none_rounded,
+                color: Color(0xFF2563EB),
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.45,
+                color: Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PromoBanner {
   final String title;
   final String subtitle;
@@ -620,10 +975,7 @@ class _CategoryItem {
   final String label;
   final IconData icon;
 
-  const _CategoryItem({
-    required this.label,
-    required this.icon,
-  });
+  const _CategoryItem({required this.label, required this.icon});
 }
 
 class _CategoryButton extends StatelessWidget {
@@ -681,11 +1033,7 @@ class _FilterChip extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
-  const _FilterChip({
-    required this.label,
-    this.isActive = false,
-    this.onTap,
-  });
+  const _FilterChip({required this.label, this.isActive = false, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -754,7 +1102,7 @@ class _ListingCardState extends State<_ListingCard> {
         : '${product.location.trim()}, ${product.specificLocation.trim()}';
 
     return GestureDetector(
-                      onTap: () {
+      onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => ListingDetailsPage(
@@ -839,103 +1187,105 @@ class _ListingCardState extends State<_ListingCard> {
                       ),
                     ],
                   ),
-                SizedBox(height: compactLayout ? 6 : 8),
-                Text(
-                  product.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: compactLayout ? 15 : 17,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1D1D1D),
-                  ),
-                ),
-                SizedBox(height: compactLayout ? 2 : 4),
-                Text(
-                  product.description.trim().isEmpty
-                      ? 'No description'
-                      : product.description.trim(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: compactLayout ? 12 : 13,
-                    color: Color(0xFF606060),
-                  ),
-                ),
-                SizedBox(height: compactLayout ? 6 : 8),
-                Text(
-                  _formatPrice(product.price),
-                  style: TextStyle(
-                    fontSize: compactLayout ? 16 : 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF1E88E5),
-                  ),
-                ),
-                if (hasVideo) ...[
-                  SizedBox(height: compactLayout ? 4 : 6),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: compactLayout ? 8 : 10,
-                      vertical: compactLayout ? 5 : 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4A3DE0),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.videocam_rounded,
-                          size: compactLayout ? 12 : 14,
-                          color: Colors.white,
-                        ),
-                        SizedBox(width: compactLayout ? 4 : 6),
-                        Text(
-                          'Video available',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: compactLayout ? 10 : 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+                  SizedBox(height: compactLayout ? 6 : 8),
+                  Text(
+                    product.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compactLayout ? 15 : 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1D1D1D),
                     ),
                   ),
-                ],
-                SizedBox(height: compactLayout ? 2 : 4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        detailsLocation.isEmpty ? 'No location' : detailsLocation,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: compactLayout ? 12 : 13,
-                          color: Color(0xFF4E4E4E),
-                        ),
+                  SizedBox(height: compactLayout ? 2 : 4),
+                  Text(
+                    product.description.trim().isEmpty
+                        ? 'No description'
+                        : product.description.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: compactLayout ? 12 : 13,
+                      color: Color(0xFF606060),
+                    ),
+                  ),
+                  SizedBox(height: compactLayout ? 6 : 8),
+                  Text(
+                    _formatPrice(product.price),
+                    style: TextStyle(
+                      fontSize: compactLayout ? 16 : 18,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1E88E5),
+                    ),
+                  ),
+                  if (hasVideo) ...[
+                    SizedBox(height: compactLayout ? 4 : 6),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compactLayout ? 8 : 10,
+                        vertical: compactLayout ? 5 : 6,
                       ),
-                    ),
-                    SizedBox(width: compactLayout ? 4 : 6),
-                    Text(
-                      _formatPostedTime(product.createdAt),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: compactLayout ? 11 : 12,
-                        color: Color(0xFF8A8A8A),
-                        fontWeight: FontWeight.w600,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A3DE0),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.videocam_rounded,
+                            size: compactLayout ? 12 : 14,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: compactLayout ? 4 : 6),
+                          Text(
+                            'Video available',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: compactLayout ? 10 : 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-              ],
+                  SizedBox(height: compactLayout ? 2 : 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          detailsLocation.isEmpty
+                              ? 'No location'
+                              : detailsLocation,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: compactLayout ? 12 : 13,
+                            color: Color(0xFF4E4E4E),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: compactLayout ? 4 : 6),
+                      Text(
+                        _formatPostedTime(product.createdAt),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: compactLayout ? 11 : 12,
+                          color: Color(0xFF8A8A8A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -1006,9 +1356,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
       child: Stack(
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(18),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
             child: PageView.builder(
               controller: _pageController,
               itemCount: hasNoImages ? 1 : widget.images.length,
@@ -1072,9 +1420,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                hasNoImages
-                    ? 'Video'
-                    : '${_index + 1}/${widget.images.length}',
+                hasNoImages ? 'Video' : '${_index + 1}/${widget.images.length}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,

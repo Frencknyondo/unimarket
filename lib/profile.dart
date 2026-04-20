@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'account_settings.dart';
 import 'models/user_model.dart';
 import 'message_list.dart';
 import 'my_favorites.dart';
@@ -41,7 +42,21 @@ class _ProfilePageState extends State<ProfilePage> {
         .where('userId', isEqualTo: userId)
         .get();
     final favouritesCount = favouritesSnapshot.size;
-    const chatsCount = 0;
+    final chatsSnapshot = await FirebaseFirestore.instance
+        .collection('chats')
+        .where('participantIds', arrayContains: userId)
+        .get();
+    final chatsCount = chatsSnapshot.docs.where((doc) {
+      final data = doc.data();
+      final participantIds =
+          (data['participantIds'] as List<dynamic>? ?? const [])
+              .whereType<String>()
+              .map((id) => id.trim())
+              .toSet();
+      final lastMessageText = ((data['lastMessageText'] as String?) ?? '')
+          .trim();
+      return participantIds.length > 1 && lastMessageText.isNotEmpty;
+    }).length;
 
     if (_isProvider) {
       final listingsSnapshot = await FirebaseFirestore.instance
@@ -331,15 +346,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       secondary: const Icon(Icons.notifications_none_rounded),
                     ),
                     const Divider(height: 1),
-                    const _PlainPrefTile(
-                      title: 'Privacy & Security',
-                      icon: Icons.security_outlined,
-                    ),
+                    _PrivacySecurityTile(),
                     const Divider(height: 1),
-                    const _PlainPrefTile(
-                      title: 'Help & Support',
-                      icon: Icons.help_outline_rounded,
-                    ),
+                    _HelpSupportTile(),
                   ],
                 ),
               ),
@@ -380,9 +389,7 @@ class _ProfilePageState extends State<ProfilePage> {
           return;
         }
         if (label == 'Message') {
-          Navigator.of(
-            context,
-          ).push(
+          Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => MessageListPage(currentUser: widget.user),
             ),
@@ -431,9 +438,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _onAccountItemTap(String title) {
     if (title == 'Messages') {
-      Navigator.of(
-        context,
-      ).push(
+      Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => MessageListPage(currentUser: widget.user),
         ),
@@ -462,6 +467,14 @@ class _ProfilePageState extends State<ProfilePage> {
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)));
+      return;
+    }
+    if (title == 'Account Settings') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AccountSettingsPage(user: widget.user),
+        ),
+      );
       return;
     }
   }
@@ -501,23 +514,6 @@ class _AccountItemTile extends StatelessWidget {
         ),
         onTap: onTap,
       ),
-    );
-  }
-}
-
-class _PlainPrefTile extends StatelessWidget {
-  final String title;
-  final IconData icon;
-
-  const _PlainPrefTile({required this.title, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.black54),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      trailing: const Icon(Icons.chevron_right_rounded, color: Colors.black54),
-      onTap: () {},
     );
   }
 }
@@ -608,4 +604,199 @@ class _MenuItem {
     required this.iconBg,
     required this.iconColor,
   });
+}
+
+class _PrivacySecurityTile extends StatefulWidget {
+  const _PrivacySecurityTile();
+
+  @override
+  State<_PrivacySecurityTile> createState() => _PrivacySecurityTileState();
+}
+
+class _PrivacySecurityTileState extends State<_PrivacySecurityTile> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.security_outlined, color: Colors.black54),
+          title: const Text(
+            'Privacy & Security',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          trailing: Icon(
+            _isExpanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: Colors.black54,
+          ),
+          onTap: () {
+            setState(() {
+              _isExpanded = !_isExpanded;
+            });
+          },
+        ),
+        if (_isExpanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _faqItem(
+                  question: 'How is my data protected?',
+                  answer:
+                      'We use industry-standard encryption to protect your personal information and only share data with trusted parties for transaction purposes.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'Can I delete my account?',
+                  answer:
+                      'Yes, you can delete your account from the Account Settings section. This action is permanent and cannot be undone.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'How do I change my password?',
+                  answer:
+                      'Go to Account Settings and select "Security" to change your password. Make sure to use a strong, unique password.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'Is my payment information secure?',
+                  answer:
+                      'We do not store your payment information. All transactions are processed securely through trusted payment providers.',
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _faqItem({required String question, required String answer}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            answer,
+            style: const TextStyle(color: Colors.black54, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpSupportTile extends StatefulWidget {
+  const _HelpSupportTile();
+
+  @override
+  State<_HelpSupportTile> createState() => _HelpSupportTileState();
+}
+
+class _HelpSupportTileState extends State<_HelpSupportTile> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(
+            Icons.help_outline_rounded,
+            color: Colors.black54,
+          ),
+          title: const Text(
+            'Help & Support',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          trailing: Icon(
+            _isExpanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: Colors.black54,
+          ),
+          onTap: () {
+            setState(() {
+              _isExpanded = !_isExpanded;
+            });
+          },
+        ),
+        if (_isExpanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _faqItem(
+                  question: 'How do I create a listing?',
+                  answer:
+                      'To create a listing, tap the + button on the home screen, fill in the details, and upload photos or a video of your item.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'How do I contact a seller?',
+                  answer:
+                      'You can message a seller directly from the listing details page by tapping the message button.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'What payment methods are accepted?',
+                  answer:
+                      'We currently support cash on delivery and mobile money payments.',
+                ),
+                const SizedBox(height: 8),
+                _faqItem(
+                  question: 'How do I report an issue?',
+                  answer:
+                      'If you encounter any issues, please contact our support team through the app settings or email us at support@unimarket.com.',
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _faqItem({required String question, required String answer}) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            answer,
+            style: const TextStyle(color: Colors.black54, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
 }

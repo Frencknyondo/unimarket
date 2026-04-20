@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../message_list.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart';
+import '../services/notifications_service.dart';
 import 'order_details.dart';
 
 enum _OrderFilter { all, pending, confirmed, completed }
@@ -36,6 +37,7 @@ class OrdersListPage extends StatefulWidget {
 }
 
 class _OrdersListBaseState extends State<OrdersListPage> {
+  final NotificationsService _notificationsService = NotificationsService();
   _OrderFilter _filter = _OrderFilter.all;
 
   Color _statusBg(String status) {
@@ -464,6 +466,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
+          final previousStatus = order.status;
           await FirebaseFirestore.instance
               .collection('orders')
               .doc(order.orderId)
@@ -471,6 +474,20 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                 'status': status,
                 'updatedAt': FieldValue.serverTimestamp(),
               });
+
+          if (!widget.buyerView &&
+              status == 'confirmed' &&
+              previousStatus != 'confirmed') {
+            await _notificationsService.createNotification(
+              userId: order.buyerId,
+              title: 'Order Confirmed',
+              message:
+                  'Your order for "${order.productTitle}" has been confirmed by ${order.sellerName}.',
+              type: 'order_confirmed',
+              orderId: order.orderId,
+            );
+          }
+
           if (!mounted) return;
           Navigator.of(context).pop();
         },
