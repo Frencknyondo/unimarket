@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'searching.dart';
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
 import 'services/favorites_service.dart';
@@ -24,29 +25,24 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final PageController _bannerController = PageController(viewportFraction: 1);
   final NotificationsService _notificationsService = NotificationsService();
-  int _activeBanner = 0;
   int _navIndex = 0;
   bool _showAllCategories = false;
   String _selectedCategory = 'All';
 
-  final List<_PromoBanner> _banners = const [
-    _PromoBanner(
-      title: 'NEW COLLECTIONS',
-      subtitle: '2024',
-      buttonLabel: 'Buy Now',
-      imageUrl:
-          'https://images.pexels.com/photos/5650026/pexels-photo-5650026.jpeg?auto=compress&cs=tinysrgb&w=1200',
-    ),
-    _PromoBanner(
-      title: 'TRENDING DEALS',
-      subtitle: 'SAVE BIG',
-      buttonLabel: 'Explore',
-      imageUrl:
-          'https://images.pexels.com/photos/5872361/pexels-photo-5872361.jpeg?auto=compress&cs=tinysrgb&w=1200',
-    ),
-  ];
+  // Service Ads for main banner
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _serviceAdsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _serviceAdsStream = FirebaseFirestore.instance
+        .collection('service_ads')
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(5)
+        .snapshots();
+  }
 
   final List<_CategoryItem> _categories = const [
     _CategoryItem(label: 'Clothing', icon: Icons.checkroom_rounded),
@@ -89,8 +85,111 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _bannerController.dispose();
     super.dispose();
+  }
+
+  Widget _buildServiceAdBanner({
+    required String title,
+    required String subtitle,
+    required String price,
+    required String buttonLabel,
+    required String imageUrl,
+    bool isError = false,
+    bool isLoading = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isError ? const Color(0xFFEF4444) : const Color(0xFF4A3DE0),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Stack(
+        children: [
+          if (imageUrl.isNotEmpty && !isError && !isLoading)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 150,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(18),
+                  bottomRight: Radius.circular(18),
+                ),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: const Color(0xFFE7E7E7),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_rounded,
+                        color: Colors.black38,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    height: 0.95,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (price.isNotEmpty)
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD700),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const Spacer(),
+                if (buttonLabel.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      buttonLabel,
+                      style: TextStyle(
+                        color: isError
+                            ? const Color(0xFFEF4444)
+                            : const Color(0xFF4A3DE0),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -252,128 +351,102 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(width: 12),
                   // Search Icon - styled like notification icon
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF7F7F7),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.search_rounded,
-                      color: Colors.black87,
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SearchPage()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF7F7F7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.search_rounded,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
+              // Service Ads Banner - replaces promo banners
               SizedBox(
                 height: 180,
-                child: PageView.builder(
-                  controller: _bannerController,
-                  itemCount: _banners.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _activeBanner = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final banner = _banners[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A3DE0),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 150,
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(18),
-                                bottomRight: Radius.circular(18),
-                              ),
-                              child: Image.network(
-                                banner.imageUrl,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  banner.title,
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  banner.subtitle,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 34,
-                                    height: 0.95,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 9,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    banner.buttonLabel,
-                                    style: const TextStyle(
-                                      color: Color(0xFF4A3DE0),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _serviceAdsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return _buildServiceAdBanner(
+                        title: 'Service Ads Unavailable',
+                        subtitle: 'Failed to load service ads',
+                        price: '',
+                        buttonLabel: 'Try Again',
+                        imageUrl: '',
+                        isError: true,
+                      );
+                    }
+
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return _buildServiceAdBanner(
+                        title: 'Loading...',
+                        subtitle: 'Please wait',
+                        price: '',
+                        buttonLabel: '',
+                        imageUrl: '',
+                        isLoading: true,
+                      );
+                    }
+
+                    final docs = snapshot.data?.docs ?? const [];
+                    final serviceAds = docs.map((doc) {
+                      final map = <String, dynamic>{
+                        ...doc.data(),
+                        'id': doc.id,
+                      };
+                      return map;
+                    }).toList();
+
+                    if (serviceAds.isEmpty) {
+                      return _buildServiceAdBanner(
+                        title: 'No Service Ads Yet',
+                        subtitle: 'Service providers will add ads here soon',
+                        price: '',
+                        buttonLabel: '',
+                        imageUrl: '',
+                      );
+                    }
+
+                    // Show first ad or cycle through them
+                    final ad = serviceAds.first;
+                    final price = ad['price'] != null
+                        ? 'Tsh ${(ad['price'] as num).toStringAsFixed(0)}'
+                        : '';
+
+                    return _buildServiceAdBanner(
+                      title: ad['title'] ?? 'Service Ad',
+                      subtitle: ad['description']?.length ?? 0 > 50
+                          ? '${ad['description'].toString().substring(0, 50)}...'
+                          : (ad['description'] ?? ''),
+                      price: price,
+                      buttonLabel: 'View Service',
+                      imageUrl: ad['imageUrl'] ?? '',
                     );
                   },
                 ),
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(
-                    _banners.length,
-                    (index) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _activeBanner == index ? 18 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _activeBanner == index
-                            ? const Color(0xFF4A3DE0)
-                            : const Color(0xFFE5DDF9),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
               const SizedBox(height: 22),
+
+              // Service Ads Banner
+              _sectionHeader('Service Ads'),
+              const SizedBox(height: 16),
+              _ServiceAdsBanner(user: widget.user),
+              const SizedBox(height: 22),
+
               _sectionHeader(
                 'Category',
                 actionLabel: _showAllCategories ? 'See less' : 'See All',
@@ -957,20 +1030,6 @@ class _NotificationEmptyState extends StatelessWidget {
   }
 }
 
-class _PromoBanner {
-  final String title;
-  final String subtitle;
-  final String buttonLabel;
-  final String imageUrl;
-
-  const _PromoBanner({
-    required this.title,
-    required this.subtitle,
-    required this.buttonLabel,
-    required this.imageUrl,
-  });
-}
-
 class _CategoryItem {
   final String label;
   final IconData icon;
@@ -1456,6 +1515,251 @@ class _ProductsStateCard extends StatelessWidget {
           fontSize: 14,
           color: Colors.black54,
           height: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceAdsBanner extends StatelessWidget {
+  final User user;
+
+  const _ServiceAdsBanner({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('service_ads')
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(5)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const _ServiceAdCard(
+            title: 'Service Ads Unavailable',
+            description: 'Failed to load service ads.',
+            price: 0.0,
+            contact: '',
+            createdAt: null,
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final docs = snapshot.data?.docs ?? const [];
+        if (docs.isEmpty) {
+          return Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F7F7),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(
+                    Icons.ads_click_outlined,
+                    size: 32,
+                    color: Color(0xFFA1A1AA),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'No service ads available',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Service providers will add ads here soon',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final ad = docs[index].data();
+              return Padding(
+                padding: EdgeInsets.only(
+                  right: index == docs.length - 1 ? 0 : 12,
+                ),
+                child: _ServiceAdCard(
+                  title: ad['title'] ?? 'Service Ad',
+                  description: ad['description'] ?? '',
+                  price: (ad['price'] ?? 0.0) as double,
+                  contact: ad['contact'] ?? '',
+                  createdAt: ad['createdAt'],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ServiceAdCard extends StatelessWidget {
+  final String title;
+  final String description;
+  final double price;
+  final String contact;
+  final dynamic createdAt;
+
+  const _ServiceAdCard({
+    required this.title,
+    required this.description,
+    required this.price,
+    required this.contact,
+    required this.createdAt,
+  });
+
+  String _formatDate(dynamic timestamp) {
+    if (timestamp == null) return 'Unknown';
+    if (timestamp is Timestamp) {
+      final date = timestamp.toDate();
+      return '${date.day}/${date.month}/${date.year}';
+    }
+    return timestamp.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 280,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x10000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Ad Header
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'GH₵ ${price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF22C55E),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE4E6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'SERVICE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFEF4444),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Description
+            Text(
+              description,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            const SizedBox(height: 12),
+
+            // Contact Info
+            Row(
+              children: [
+                const Icon(
+                  Icons.contact_phone_outlined,
+                  size: 16,
+                  color: Color(0xFF4A3DE0),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    contact,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 8),
+
+            // Created Date
+            Text(
+              'Posted: ${_formatDate(createdAt)}',
+              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
+            ),
+          ],
         ),
       ),
     );
