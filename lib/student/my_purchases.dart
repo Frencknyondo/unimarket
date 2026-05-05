@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../layout/provider_bottom_nav.dart';
+import '../layout/student_bottom_nav.dart';
+import '../home.dart';
 import '../message_list.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart';
@@ -96,6 +99,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isProvider = widget.user.role.trim().toLowerCase() == 'provider';
     final query = widget.buyerView
         ? FirebaseFirestore.instance
               .collection('orders')
@@ -106,6 +110,17 @@ class _OrdersListBaseState extends State<OrdersListPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
+      bottomNavigationBar: isProvider
+          ? ProviderBottomNav(
+              user: widget.user,
+              currentIndex: 1,
+              homePage: HomePage(user: widget.user),
+            )
+          : StudentBottomNav(
+              user: widget.user,
+              currentIndex: 1,
+              homePage: HomePage(user: widget.user),
+            ),
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,

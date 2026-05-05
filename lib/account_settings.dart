@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'models/user_model.dart';
-import 'service_ads.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   final User user;
@@ -41,7 +40,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     super.dispose();
   }
 
-  Future<void> _updateProfile() async {
+    Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -50,7 +49,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
     try {
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection('unimarket_db')
           .doc(widget.user.uid)
           .update({
             'fullName': _nameController.text.trim(),
@@ -82,7 +81,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     }
   }
 
-  Future<void> _changePassword() async {
+    Future<void> _changePassword() async {
     if (_newPasswordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +120,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     try {
       // Update password in Firestore
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection('unimarket_db')
           .doc(widget.user.uid)
           .update({'password': _newPasswordController.text});
 
@@ -569,68 +568,6 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Service Advertising Section
-                  const Text(
-                    'My List',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFE4E6),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.ads_click_outlined,
-                              color: Color(0xFFEF4444),
-                            ),
-                          ),
-                          title: const Text(
-                            'Service Advertising',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'Create and manage service ads',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          trailing: const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.black54,
-                          ),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ServiceAdsPage(user: widget.user),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
                     ),
                   ),
                   const SizedBox(height: 24),

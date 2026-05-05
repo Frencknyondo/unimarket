@@ -210,6 +210,10 @@ class _CreateListingPageState extends State<CreateListingPage> {
     _showLoadingCard('Creating listing...');
 
     try {
+      final sellerName = widget.user.fullName.trim().isEmpty
+          ? widget.user.email.trim()
+          : widget.user.fullName.trim();
+
       await FirebaseFirestore.instance.collection('listings').add({
         'title': _titleController.text.trim(),
         'description': _descriptionController.text.trim(),
@@ -221,8 +225,8 @@ class _CreateListingPageState extends State<CreateListingPage> {
         'imageUrls': _imageUrls,
         'videoUrl': _videoUrl,
         'sellerId': widget.user.uid,
-        'sellerName': widget.user.fullName,
-        'sellerEmail': widget.user.email,
+        'sellerName': sellerName,
+        'sellerEmail': widget.user.email.trim(),
         'userId': widget.user.uid,
         'createdAt': Timestamp.now(),
       });

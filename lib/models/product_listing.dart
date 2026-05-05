@@ -38,11 +38,17 @@ class ProductListing {
   factory ProductListing.fromMap(Map<String, dynamic> map) {
     final imageList = map['images'] ?? map['imageUrls'];
     final timestamp = map['createdAt'];
+    final rawSellerName =
+        map['sellerName'] as String? ??
+        map['userName'] as String? ??
+        map['fullName'] as String? ??
+        '';
+    final sellerName = rawSellerName.trim();
 
     return ProductListing(
       productId: map['productId'] as String? ?? '',
       sellerId: (map['sellerId'] as String?) ?? (map['userId'] as String?) ?? '',
-      sellerName: map['sellerName'] as String? ?? 'Unknown seller',
+      sellerName: sellerName.isEmpty ? 'Unknown seller' : sellerName,
       sellerEmail: map['sellerEmail'] as String? ?? '',
       title: map['title'] as String? ?? '',
       price: (map['price'] as num?)?.toDouble() ?? 0,

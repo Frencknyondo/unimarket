@@ -2,10 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'account_settings.dart';
+import 'home.dart';
+import 'layout/provider_bottom_nav.dart';
+import 'layout/student_bottom_nav.dart';
 import 'models/user_model.dart';
 import 'message_list.dart';
 import 'my_favorites.dart';
-import 'provider/create_listing.dart';
 import 'provider/my_listings.dart';
 import 'provider/my_sales.dart';
 import 'signin.dart';
@@ -149,54 +151,17 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
-      floatingActionButton: _isProvider
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CreateListingPage(user: widget.user),
-                  ),
-                );
-              },
-              backgroundColor: const Color(0xFF4A3DE0),
-              foregroundColor: Colors.white,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add_rounded, size: 32),
+      bottomNavigationBar: _isProvider
+          ? ProviderBottomNav(
+              user: widget.user,
+              currentIndex: 3,
+              homePage: HomePage(user: widget.user),
             )
-          : null,
-      floatingActionButtonLocation: _isProvider
-          ? FloatingActionButtonLocation.centerDocked
-          : null,
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        shape: _isProvider ? const CircularNotchedRectangle() : null,
-        notchMargin: _isProvider ? 10 : 0,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.home_filled, 'Home', 0),
-              _navItem(
-                _isProvider
-                    ? Icons.storefront_outlined
-                    : Icons.receipt_long_outlined,
-                _isProvider ? 'Mysales' : 'Order',
-                1,
-              ),
-              if (_isProvider) ...[
-                const SizedBox(width: 40),
-                _navItem(Icons.message_outlined, 'Message', 2),
-                _navItem(Icons.person_outline_rounded, 'Profile', 3),
-              ] else ...[
-                _navItem(Icons.message_outlined, 'Message', 1),
-                _navItem(Icons.person_outline_rounded, 'Profile', 2),
-              ],
-            ],
-          ),
-        ),
-      ),
+          : StudentBottomNav(
+              user: widget.user,
+              currentIndex: 3,
+              homePage: HomePage(user: widget.user),
+            ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
@@ -374,63 +339,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, int index) {
-    final activeIndex = _isProvider ? 3 : 2;
-    final isActive = activeIndex == index;
-    return InkWell(
-      onTap: () {
-        if (label == 'Home') {
-          Navigator.of(context).pop();
-          return;
-        }
-        if (label == 'Message') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MessageListPage(currentUser: widget.user),
-            ),
-          );
-          return;
-        }
-        if (label == 'Order') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MyPurchasesPage(user: widget.user),
-            ),
-          );
-          return;
-        }
-        if (label == 'Mysales') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
-          );
-          return;
-        }
-        return;
-      },
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
-              ),
-            ),
-          ],
         ),
       ),
     );

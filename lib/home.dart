@@ -3,17 +3,14 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'layout/provider_bottom_nav.dart';
+import 'layout/student_bottom_nav.dart';
 import 'searching.dart';
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
 import 'services/favorites_service.dart';
 import 'services/notifications_service.dart';
-import 'message_list.dart';
-import 'profile.dart';
-import 'provider/create_listing.dart';
-import 'provider/my_sales.dart';
 import 'student/listing_details.dart';
-import 'student/my_purchases.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -26,23 +23,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final NotificationsService _notificationsService = NotificationsService();
-  int _navIndex = 0;
   bool _showAllCategories = false;
   String _selectedCategory = 'All';
-
-  // Service Ads for main banner
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _serviceAdsStream;
-
-  @override
-  void initState() {
-    super.initState();
-    _serviceAdsStream = FirebaseFirestore.instance
-        .collection('service_ads')
-        .where('isActive', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
-        .limit(5)
-        .snapshots();
-  }
 
   final List<_CategoryItem> _categories = const [
     _CategoryItem(label: 'Clothing', icon: Icons.checkroom_rounded),
@@ -62,10 +44,30 @@ class _HomePageState extends State<HomePage> {
     return normalized;
   }
 
-  bool _matchesSelectedCategory(ProductListing item) {
-    if (_selectedCategory == 'All') return true;
-    return _normalizeCategory(item.category) ==
-        _normalizeCategory(_selectedCategory);
+  final Set<String> _sellerNameBackfills = {};
+
+  bool _needsSellerName(String value) {
+    final normalized = value.trim().toLowerCase();
+    return normalized.isEmpty || normalized == 'unknown seller';
+  }
+
+  void _backfillSellerName({
+    required String listingId,
+    required String sellerName,
+  }) {
+    final cleanName = sellerName.trim();
+    if (listingId.isEmpty || _needsSellerName(cleanName)) return;
+    if (!_sellerNameBackfills.add(listingId)) return;
+
+    unawaited(
+      FirebaseFirestore.instance
+          .collection('listings')
+          .doc(listingId)
+          .update({'sellerName': cleanName})
+          .catchError((_) {
+            _sellerNameBackfills.remove(listingId);
+          }),
+    );
   }
 
   Future<void> _showNotificationsSheet() async {
@@ -88,110 +90,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Widget _buildServiceAdBanner({
-    required String title,
-    required String subtitle,
-    required String price,
-    required String buttonLabel,
-    required String imageUrl,
-    bool isError = false,
-    bool isLoading = false,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isError ? const Color(0xFFEF4444) : const Color(0xFF4A3DE0),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Stack(
-        children: [
-          if (imageUrl.isNotEmpty && !isError && !isLoading)
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: 150,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
-                ),
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: const Color(0xFFE7E7E7),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.broken_image_rounded,
-                        color: Colors.black38,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    height: 0.95,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (price.isNotEmpty)
-                  Text(
-                    price,
-                    style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                const Spacer(),
-                if (buttonLabel.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 9,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      buttonLabel,
-                      style: TextStyle(
-                        color: isError
-                            ? const Color(0xFFEF4444)
-                            : const Color(0xFF4A3DE0),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final userName = widget.user.fullName.trim().isEmpty
@@ -202,54 +100,9 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: isProvider
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CreateListingPage(user: widget.user),
-                  ),
-                );
-              },
-              backgroundColor: const Color(0xFF4A3DE0),
-              foregroundColor: Colors.white,
-              shape: const CircleBorder(),
-              child: const Icon(Icons.add_rounded, size: 32),
-            )
-          : null,
-      floatingActionButtonLocation: isProvider
-          ? FloatingActionButtonLocation.centerDocked
-          : null,
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.white,
-        surfaceTintColor: Colors.white,
-        shape: isProvider ? const CircularNotchedRectangle() : null,
-        notchMargin: isProvider ? 10 : 0,
-        child: SizedBox(
-          height: 72,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.home_filled, 'Home', 0),
-              _navItem(
-                isProvider
-                    ? Icons.storefront_outlined
-                    : Icons.receipt_long_outlined,
-                isProvider ? 'Mysales' : 'Order',
-                1,
-              ),
-              if (isProvider) ...[
-                const SizedBox(width: 40),
-                _navItem(Icons.message_outlined, 'Message', 2),
-                _navItem(Icons.person_outline_rounded, 'Profile', 3),
-              ] else ...[
-                _navItem(Icons.message_outlined, 'Message', 1),
-                _navItem(Icons.person_outline_rounded, 'Profile', 2),
-              ],
-            ],
-          ),
-        ),
-      ),
+      bottomNavigationBar: isProvider
+          ? ProviderBottomNav(user: widget.user, currentIndex: 0)
+          : StudentBottomNav(user: widget.user, currentIndex: 0),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -374,78 +227,6 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 20),
-              // Service Ads Banner - replaces promo banners
-              SizedBox(
-                height: 180,
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _serviceAdsStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return _buildServiceAdBanner(
-                        title: 'Service Ads Unavailable',
-                        subtitle: 'Failed to load service ads',
-                        price: '',
-                        buttonLabel: 'Try Again',
-                        imageUrl: '',
-                        isError: true,
-                      );
-                    }
-
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return _buildServiceAdBanner(
-                        title: 'Loading...',
-                        subtitle: 'Please wait',
-                        price: '',
-                        buttonLabel: '',
-                        imageUrl: '',
-                        isLoading: true,
-                      );
-                    }
-
-                    final docs = snapshot.data?.docs ?? const [];
-                    final serviceAds = docs.map((doc) {
-                      final map = <String, dynamic>{
-                        ...doc.data(),
-                        'id': doc.id,
-                      };
-                      return map;
-                    }).toList();
-
-                    if (serviceAds.isEmpty) {
-                      return _buildServiceAdBanner(
-                        title: 'No Service Ads Yet',
-                        subtitle: 'Service providers will add ads here soon',
-                        price: '',
-                        buttonLabel: '',
-                        imageUrl: '',
-                      );
-                    }
-
-                    // Show first ad or cycle through them
-                    final ad = serviceAds.first;
-                    final price = ad['price'] != null
-                        ? 'Tsh ${(ad['price'] as num).toStringAsFixed(0)}'
-                        : '';
-
-                    return _buildServiceAdBanner(
-                      title: ad['title'] ?? 'Service Ad',
-                      subtitle: ad['description']?.length ?? 0 > 50
-                          ? '${ad['description'].toString().substring(0, 50)}...'
-                          : (ad['description'] ?? ''),
-                      price: price,
-                      buttonLabel: 'View Service',
-                      imageUrl: ad['imageUrl'] ?? '',
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 22),
-
-              // Service Ads Banner
-              _sectionHeader('Service Ads'),
-              const SizedBox(height: 16),
-              _ServiceAdsBanner(user: widget.user),
-              const SizedBox(height: 22),
 
               _sectionHeader(
                 'Category',
@@ -526,74 +307,117 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 18),
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-                    .collection('listings')
-                    .orderBy('createdAt', descending: true)
+                    .collection('unimarket_db')
                     .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const _ProductsStateCard(
-                      message: 'Failed to load listings.',
-                    );
+                builder: (context, usersSnapshot) {
+                  final sellerNames = <String, String>{};
+                  for (final doc in usersSnapshot.data?.docs ?? const []) {
+                    final data = doc.data();
+                    if (data != null && data['role'] == 'provider') {
+                      sellerNames[doc.id] = data['fullName'] ?? 'Unknown';
+                    }
                   }
 
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
+                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('listings')
+                        .orderBy('createdAt', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return const _ProductsStateCard(
+                          message: 'Failed to load listings.',
+                        );
+                      }
 
-                  final docs = snapshot.data?.docs ?? const [];
-                  final listings = docs
-                      .map((doc) {
-                        final map = <String, dynamic>{
-                          ...doc.data(),
-                          'productId':
-                              (doc.data()['productId'] as String?) ?? doc.id,
-                        };
-                        return ProductListing.fromMap(map);
-                      })
-                      .where(
-                        (item) => item.images.isNotEmpty || item.video != null,
-                      )
-                      .toList();
-                  if (listings.isEmpty) {
-                    return const _ProductsStateCard(
-                      message:
-                          'No listings found yet. products and they will appear here.',
-                    );
-                  }
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
 
-                  final filteredListings = listings
-                      .where(_matchesSelectedCategory)
-                      .toList();
+                      final docs = snapshot.data?.docs ?? const [];
+                      final listings = docs
+                          .map((doc) {
+                            final data = doc.data();
+                            final storedName =
+                                (data['sellerName'] as String? ?? '').trim();
+                            final sellerId =
+                                (data['sellerId'] as String? ??
+                                        data['userId'] as String? ??
+                                        '')
+                                    .trim();
+                            final sellerName = (!_needsSellerName(storedName))
+                                ? storedName
+                                : (sellerNames[sellerId] ?? 'Unknown seller');
+                            final map = <String, dynamic>{
+                              ...data,
+                              'productId':
+                                  (data['productId'] as String?) ?? doc.id,
+                              'sellerName': sellerName,
+                            };
 
-                  if (filteredListings.isEmpty) {
-                    final message = _selectedCategory == 'All'
-                        ? 'No listings found yet. Products will appear here soon.'
-                        : '$_selectedCategory listings are coming soon.';
-                    return _ProductsStateCard(message: message);
-                  }
+                            if (_needsSellerName(
+                              data['sellerName'] as String? ?? '',
+                            )) {
+                              _backfillSellerName(
+                                listingId: doc.id,
+                                sellerName: sellerName,
+                              );
+                            }
 
-                  return LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isCompactPhone = constraints.maxWidth < 380;
+                            return ProductListing.fromMap(map);
+                          })
+                          .where(
+                            (item) =>
+                                item.images.isNotEmpty || item.video != null,
+                          )
+                          .toList();
+                      if (listings.isEmpty) {
+                        return const _ProductsStateCard(
+                          message:
+                              'No listings found yet. products and they will appear here.',
+                        );
+                      }
 
-                      return GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: filteredListings.length,
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: isCompactPhone ? 0.58 : 0.62,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 14,
-                        ),
-                        itemBuilder: (context, index) {
-                          return _ListingCard(
-                            product: filteredListings[index],
-                            currentUser: widget.user,
-                            compactLayout: isCompactPhone,
+                      final filteredListings = listings.where((item) {
+                        if (_selectedCategory == 'All') return true;
+                        return _normalizeCategory(item.category) ==
+                            _normalizeCategory(_selectedCategory);
+                      }).toList();
+
+                      if (filteredListings.isEmpty) {
+                        final message = _selectedCategory == 'All'
+                            ? 'No listings found yet. Products will appear here soon.'
+                            : '$_selectedCategory listings are coming soon.';
+                        return _ProductsStateCard(message: message);
+                      }
+
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCompactPhone = constraints.maxWidth < 380;
+
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: filteredListings.length,
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: isCompactPhone
+                                      ? 0.58
+                                      : 0.62,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 14,
+                                ),
+                             itemBuilder: (context, index) {
+                               return _ListingCard(
+                                 product: filteredListings[index],
+                                 currentUser: widget.user,
+                                 compactLayout: true,
+                               );
+                             },
                           );
                         },
                       );
@@ -641,65 +465,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _navItem(IconData icon, String label, int index) {
-    final isActive = _navIndex == index;
-    return InkWell(
-      onTap: () {
-        if (label == 'Profile') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ProfilePage(user: widget.user)),
-          );
-          return;
-        }
-        if (label == 'Message') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MessageListPage(currentUser: widget.user),
-            ),
-          );
-          return;
-        }
-        if (label == 'Order') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => MyPurchasesPage(user: widget.user),
-            ),
-          );
-          return;
-        }
-        if (label == 'Mysales') {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)),
-          );
-          return;
-        }
-        setState(() {
-          _navIndex = index;
-        });
-      },
-      child: SizedBox(
-        width: 64,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isActive ? const Color(0xFF4A3DE0) : Colors.black38,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _NotificationsSheet extends StatelessWidget {
@@ -1121,11 +886,7 @@ class _ListingCard extends StatefulWidget {
   final User currentUser;
   final bool compactLayout;
 
-  const _ListingCard({
-    required this.product,
-    required this.currentUser,
-    this.compactLayout = false,
-  });
+  const _ListingCard({required this.product, required this.currentUser, required this.compactLayout});
 
   @override
   State<_ListingCard> createState() => _ListingCardState();
@@ -1515,251 +1276,6 @@ class _ProductsStateCard extends StatelessWidget {
           fontSize: 14,
           color: Colors.black54,
           height: 1.5,
-        ),
-      ),
-    );
-  }
-}
-
-class _ServiceAdsBanner extends StatelessWidget {
-  final User user;
-
-  const _ServiceAdsBanner({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('service_ads')
-          .where('isActive', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(5)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const _ServiceAdCard(
-            title: 'Service Ads Unavailable',
-            description: 'Failed to load service ads.',
-            price: 0.0,
-            contact: '',
-            createdAt: null,
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 120,
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final docs = snapshot.data?.docs ?? const [];
-        if (docs.isEmpty) {
-          return Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F7),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(
-                    Icons.ads_click_outlined,
-                    size: 32,
-                    color: Color(0xFFA1A1AA),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'No service ads available',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B7280),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'Service providers will add ads here soon',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
-        return SizedBox(
-          height: 160,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final ad = docs[index].data();
-              return Padding(
-                padding: EdgeInsets.only(
-                  right: index == docs.length - 1 ? 0 : 12,
-                ),
-                child: _ServiceAdCard(
-                  title: ad['title'] ?? 'Service Ad',
-                  description: ad['description'] ?? '',
-                  price: (ad['price'] ?? 0.0) as double,
-                  contact: ad['contact'] ?? '',
-                  createdAt: ad['createdAt'],
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ServiceAdCard extends StatelessWidget {
-  final String title;
-  final String description;
-  final double price;
-  final String contact;
-  final dynamic createdAt;
-
-  const _ServiceAdCard({
-    required this.title,
-    required this.description,
-    required this.price,
-    required this.contact,
-    required this.createdAt,
-  });
-
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'Unknown';
-    if (timestamp is Timestamp) {
-      final date = timestamp.toDate();
-      return '${date.day}/${date.month}/${date.year}';
-    }
-    return timestamp.toString();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x10000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ad Header
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'GH₵ ${price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF22C55E),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFE4E6),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'SERVICE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Description
-            Text(
-              description,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B7280),
-                height: 1.4,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-
-            const SizedBox(height: 12),
-
-            // Contact Info
-            Row(
-              children: [
-                const Icon(
-                  Icons.contact_phone_outlined,
-                  size: 16,
-                  color: Color(0xFF4A3DE0),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    contact,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Created Date
-            Text(
-              'Posted: ${_formatDate(createdAt)}',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)),
-            ),
-          ],
         ),
       ),
     );

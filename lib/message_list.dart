@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'home.dart';
+import 'layout/provider_bottom_nav.dart';
+import 'layout/student_bottom_nav.dart';
 import 'models/user_model.dart';
 
 class MessageListPage extends StatefulWidget {
@@ -78,12 +81,26 @@ class _MessageListPageState extends State<MessageListPage>
 
   @override
   Widget build(BuildContext context) {
+    final isProvider =
+        widget.currentUser.role.trim().toLowerCase() == 'provider';
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openInitialPeerIfNeeded();
     });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FF),
+      bottomNavigationBar: isProvider
+          ? ProviderBottomNav(
+              user: widget.currentUser,
+              currentIndex: 2,
+              homePage: HomePage(user: widget.currentUser),
+            )
+          : StudentBottomNav(
+              user: widget.currentUser,
+              currentIndex: 2,
+              homePage: HomePage(user: widget.currentUser),
+            ),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F6FF),
         surfaceTintColor: const Color(0xFFF3F6FF),
