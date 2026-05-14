@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
+
 import 'models/user_model.dart';
+import 'services/cloudinary_service.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   final User user;
@@ -13,18 +17,28 @@ class AccountSettingsPage extends StatefulWidget {
 
 class _AccountSettingsPageState extends State<AccountSettingsPage> {
   final _formKey = GlobalKey<FormState>();
+  late User _currentUser;
   late TextEditingController _nameController;
   late TextEditingController _profilePicController;
   late TextEditingController _currentPasswordController;
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
   bool _isLoading = false;
+  bool _isUploadingImage = false;
+  String? _currentProfilePictureUrl;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.user.fullName);
-    _profilePicController = TextEditingController();
+    _currentUser = widget.user;
+    _currentProfilePictureUrl =
+        _currentUser.profilePicture?.trim().isNotEmpty == true
+        ? _currentUser.profilePicture!.trim()
+        : null;
+    _nameController = TextEditingController(text: _currentUser.fullName);
+    _profilePicController = TextEditingController(
+      text: _currentProfilePictureUrl ?? '',
+    );
     _currentPasswordController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
@@ -40,7 +54,75 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     super.dispose();
   }
 
-    Future<void> _updateProfile() async {
+  User _userWith({
+    required String fullName,
+    required String? profilePicture,
+  }) {
+    return User(
+      uid: _currentUser.uid,
+      registrationNo: _currentUser.registrationNo,
+      email: _currentUser.email,
+      fullName: fullName,
+      password: _currentUser.password,
+      role: _currentUser.role,
+      createdAt: _currentUser.createdAt,
+      profilePicture: profilePicture,
+      isOnline: _currentUser.isOnline,
+      lastSeenAt: _currentUser.lastSeenAt,
+    );
+  }
+
+  Future<void> _saveProfileChanges({
+    required bool showSuccess,
+    bool showError = true,
+  }) async {
+    try {
+      final updatedPhotoUrl = _profilePicController.text.trim().isNotEmpty
+          ? _profilePicController.text.trim()
+          : _currentProfilePictureUrl;
+      final updatedName = _nameController.text.trim();
+
+      final updateData = <String, dynamic>{
+        'fullName': updatedName,
+      };
+
+      if (updatedPhotoUrl != null && updatedPhotoUrl.isNotEmpty) {
+        updateData['profilePicture'] = updatedPhotoUrl;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('unimarket_db')
+          .doc(_currentUser.uid)
+          .update(updateData);
+
+      _currentProfilePictureUrl = updatedPhotoUrl;
+      _currentUser = _userWith(
+        fullName: updatedName,
+        profilePicture: _currentProfilePictureUrl,
+      );
+
+      if (!mounted) return;
+      if (showSuccess) {
+        _showStatusPopup(
+          title: 'Profile updated',
+          message: 'Your profile changes have been saved.',
+          isError: false,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      if (showError) {
+        _showStatusPopup(
+          title: 'Update failed',
+          message: 'Error updating profile: $e',
+          isError: true,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -48,30 +130,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('unimarket_db')
-          .doc(widget.user.uid)
-          .update({
-            'fullName': _nameController.text.trim(),
-            if (_profilePicController.text.trim().isNotEmpty)
-              'profilePicture': _profilePicController.text.trim(),
-          });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error updating profile: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      await _saveProfileChanges(showSuccess: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -81,7 +140,166 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
     }
   }
 
-    Future<void> _changePassword() async {
+  Future<void> _pickProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+
+    if (pickedFile == null) {
+      return;
+    }
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      final uploadedUrl = kIsWeb
+          ? await CloudinaryService.uploadImageBytes(
+              bytes: await pickedFile.readAsBytes(),
+              filename: pickedFile.name,
+            )
+          : await CloudinaryService.uploadImageFromPath(pickedFile.path);
+
+      if (uploadedUrl == null) {
+        if (!mounted) return;
+        _showStatusPopup(
+          title: 'Upload failed',
+          message: 'Image upload failed. Please try again.',
+          isError: true,
+        );
+        return;
+      }
+
+      _currentProfilePictureUrl = uploadedUrl;
+      _profilePicController.text = uploadedUrl;
+
+      if (!mounted) return;
+      await _saveProfileChanges(showSuccess: false, showError: false);
+
+      if (!mounted) return;
+      _showStatusPopup(
+        title: 'Photo updated',
+        message: 'Your profile photo has been uploaded and saved.',
+        isError: false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showStatusPopup(
+        title: 'Upload failed',
+        message: 'Image upload failed: $e',
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _showStatusPopup({
+    required String title,
+    required String message,
+    required bool isError,
+  }) {
+    final color = isError ? const Color(0xFFEF4444) : const Color(0xFF16A34A);
+
+    return showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withAlpha(75),
+      builder: (context) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 340),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x26000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(25),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isError
+                            ? Icons.error_outline_rounded
+                            : Icons.check_circle_outline_rounded,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.35,
+                        color: Color(0xFF5C5C5C),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _changePassword() async {
     if (_newPasswordController.text.isEmpty ||
         _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -121,7 +339,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
       // Update password in Firestore
       await FirebaseFirestore.instance
           .collection('unimarket_db')
-          .doc(widget.user.uid)
+          .doc(_currentUser.uid)
           .update({'password': _newPasswordController.text});
 
       if (!mounted) return;
@@ -265,63 +483,240 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.black87,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          Navigator.of(context).pop(_currentUser);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F5F7),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.black87,
+            ),
+            onPressed: () {
+              Navigator.of(context).pop(_currentUser);
+            },
           ),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
-        title: const Text(
-          'Account Settings',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
+          title: const Text(
+            'Account Settings',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
           ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Profile Information Section
-                  const Text(
-                    'Profile Information',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Profile Information Section
+                    const Text(
+                      'Profile Information',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            // Profile picture preview
+                            Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 42,
+                                  backgroundColor: const Color(0xFFF0F0F0),
+                                  backgroundImage:
+                                      _currentProfilePictureUrl != null
+                                      ? NetworkImage(_currentProfilePictureUrl!)
+                                      : null,
+                                  child: _currentProfilePictureUrl == null
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 42,
+                                          color: Color(0xFFB5B5B5),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _isUploadingImage
+                                        ? null
+                                        : _pickProfileImage,
+                                    icon: const Icon(
+                                      Icons.photo_library_outlined,
+                                    ),
+                                    label: Text(
+                                      _isUploadingImage
+                                          ? 'Uploading...'
+                                          : 'Upload Profile Photo',
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF4A3DE0),
+                                      side: const BorderSide(
+                                        color: Color(0xFF4A3DE0),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_isUploadingImage) ...[
+                                  const SizedBox(height: 8),
+                                  const LinearProgressIndicator(),
+                                ],
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                            // Full Name Field
+                            TextFormField(
+                              controller: _nameController,
+                              decoration: InputDecoration(
+                                labelText: 'Full Name',
+                                prefixIcon: const Icon(Icons.person_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF4A3DE0),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Please enter your name';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Profile Picture URL Field
+                            TextFormField(
+                              controller: _profilePicController,
+                              decoration: InputDecoration(
+                                labelText: 'Profile Picture URL',
+                                hintText: 'https://example.com/image.jpg',
+                                prefixIcon: const Icon(Icons.image_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF4A3DE0),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              keyboardType: TextInputType.url,
+                            ),
+                            const SizedBox(height: 16),
+                            // Email (Read-only)
+                            TextFormField(
+                              initialValue: _currentUser.email,
+                              enabled: false,
+                              decoration: InputDecoration(
+                                labelText: 'Email Address',
+                                prefixIcon: const Icon(Icons.email_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    padding: const EdgeInsets.all(16),
-                    child: Form(
-                      key: _formKey,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Email cannot be changed. Contact support for assistance.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Change Password Section
+                    const Text(
+                      'Change Password',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          // Full Name Field
+                          // Current Password
                           TextFormField(
-                            controller: _nameController,
+                            controller: _currentPasswordController,
+                            obscureText: true,
                             decoration: InputDecoration(
-                              labelText: 'Full Name',
-                              prefixIcon: const Icon(Icons.person_outlined),
+                              labelText: 'Current Password',
+                              prefixIcon: const Icon(Icons.lock_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
@@ -342,21 +737,15 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 ),
                               ),
                             ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              return null;
-                            },
                           ),
                           const SizedBox(height: 16),
-                          // Profile Picture URL Field
+                          // New Password
                           TextFormField(
-                            controller: _profilePicController,
+                            controller: _newPasswordController,
+                            obscureText: true,
                             decoration: InputDecoration(
-                              labelText: 'Profile Picture URL',
-                              hintText: 'https://example.com/image.jpg',
-                              prefixIcon: const Icon(Icons.image_outlined),
+                              labelText: 'New Password',
+                              prefixIcon: const Icon(Icons.lock_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
@@ -377,16 +766,15 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 ),
                               ),
                             ),
-                            keyboardType: TextInputType.url,
                           ),
                           const SizedBox(height: 16),
-                          // Email (Read-only)
+                          // Confirm New Password
                           TextFormField(
-                            initialValue: widget.user.email,
-                            enabled: false,
+                            controller: _confirmPasswordController,
+                            obscureText: true,
                             decoration: InputDecoration(
-                              labelText: 'Email Address',
-                              prefixIcon: const Icon(Icons.email_outlined),
+                              labelText: 'Confirm New Password',
+                              prefixIcon: const Icon(Icons.lock_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
@@ -397,6 +785,36 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: const BorderSide(
                                   color: Color(0xFFE5E7EB),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: Color(0xFF4A3DE0),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Update Password Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _changePassword,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4A3DE0),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Update Password',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -404,276 +822,135 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                         ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Email cannot be changed. Contact support for assistance.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black54,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // Change Password Section
-                  const Text(
-                    'Change Password',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
+                    // Save Profile Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _updateProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Save Profile Changes',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
+                    const SizedBox(height: 24),
+
+                    // Terms and Conditions Section
+                    const Text(
+                      'Legal',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
                     ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // Current Password
-                        TextFormField(
-                          controller: _currentPasswordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Current Password',
-                            prefixIcon: const Icon(Icons.lock_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3EAFE),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.description_outlined,
+                                color: Color(0xFFA855F7),
                               ),
                             ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF4A3DE0),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // New Password
-                        TextFormField(
-                          controller: _newPasswordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'New Password',
-                            prefixIcon: const Icon(Icons.lock_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF4A3DE0),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Confirm New Password
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: 'Confirm New Password',
-                            prefixIcon: const Icon(Icons.lock_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFFE5E7EB),
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF4A3DE0),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Update Password Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _changePassword,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4A3DE0),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text(
-                              'Update Password',
+                            title: const Text(
+                              'Terms & Conditions',
                               style: TextStyle(
-                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
+                                fontSize: 16,
                               ),
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Save Profile Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: _updateProfile,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF22C55E),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: const Text(
-                        'Save Profile Changes',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Terms and Conditions Section
-                  const Text(
-                    'Legal',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3EAFE),
-                              borderRadius: BorderRadius.circular(10),
+                            subtitle: const Text(
+                              'Read our terms of service',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.description_outlined,
-                              color: Color(0xFFA855F7),
-                            ),
-                          ),
-                          title: const Text(
-                            'Terms & Conditions',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'Read our terms of service',
-                            style: TextStyle(
-                              fontSize: 13,
+                            trailing: const Icon(
+                              Icons.chevron_right_rounded,
                               color: Colors.black54,
                             ),
+                            onTap: _showTermsAndConditions,
                           ),
-                          trailing: const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.black54,
-                          ),
-                          onTap: _showTermsAndConditions,
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE7F2FF),
-                              borderRadius: BorderRadius.circular(10),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE7F2FF),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.privacy_tip_outlined,
+                                color: Color(0xFF2F65FF),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.privacy_tip_outlined,
-                              color: Color(0xFF2F65FF),
+                            title: const Text(
+                              'Privacy Policy',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
                             ),
-                          ),
-                          title: const Text(
-                            'Privacy Policy',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
+                            subtitle: const Text(
+                              'How we protect your data',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                              ),
                             ),
-                          ),
-                          subtitle: const Text(
-                            'How we protect your data',
-                            style: TextStyle(
-                              fontSize: 13,
+                            trailing: const Icon(
+                              Icons.chevron_right_rounded,
                               color: Colors.black54,
                             ),
+                            onTap: () {
+                              _showPrivacyPolicy();
+                            },
                           ),
-                          trailing: const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.black54,
-                          ),
-                          onTap: () {
-                            _showPrivacyPolicy();
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 32),
+                    const SizedBox(height: 32),
 
-                  // Version Info
-                  const Center(
-                    child: Text(
-                      'UniMarket v1.0.0',
-                      style: TextStyle(fontSize: 12, color: Colors.black38),
+                    // Version Info
+                    const Center(
+                      child: Text(
+                        'UniMarket v1.0.0',
+                        style: TextStyle(fontSize: 12, color: Colors.black38),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 

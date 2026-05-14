@@ -97,6 +97,7 @@ class _HomePageState extends State<HomePage> {
         : widget.user.fullName.trim();
     final normalizedRole = widget.user.role.trim().toLowerCase();
     final isProvider = normalizedRole == 'provider';
+    final profileImageUrl = widget.user.profilePicture?.trim();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -114,9 +115,12 @@ class _HomePageState extends State<HomePage> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: const Color(0xFFEDEBFF),
-                    backgroundImage: NetworkImage(
-                      'https://api.dicebear.com/7.x/adventurer-neutral/png?seed=${Uri.encodeComponent(userName)}',
-                    ),
+                    backgroundImage:
+                        profileImageUrl != null && profileImageUrl.isNotEmpty
+                        ? NetworkImage(profileImageUrl)
+                        : NetworkImage(
+                            'https://api.dicebear.com/7.x/adventurer-neutral/png?seed=${Uri.encodeComponent(userName)}',
+                          ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -125,7 +129,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         const Text(
                           'Welcome back,',
-                          style: TextStyle(fontSize: 15, color: Colors.black54),
+                          style: TextStyle(fontSize: 13, color: Colors.black54),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -133,7 +137,7 @@ class _HomePageState extends State<HomePage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 26,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: Colors.black87,
                           ),
@@ -411,13 +415,13 @@ class _HomePageState extends State<HomePage> {
                                   mainAxisSpacing: 16,
                                   crossAxisSpacing: 14,
                                 ),
-                             itemBuilder: (context, index) {
-                               return _ListingCard(
-                                 product: filteredListings[index],
-                                 currentUser: widget.user,
-                                 compactLayout: true,
-                               );
-                             },
+                            itemBuilder: (context, index) {
+                              return _ListingCard(
+                                product: filteredListings[index],
+                                currentUser: widget.user,
+                                compactLayout: true,
+                              );
+                            },
                           );
                         },
                       );
@@ -442,7 +446,7 @@ class _HomePageState extends State<HomePage> {
         Text(
           title,
           style: const TextStyle(
-            fontSize: 30,
+            fontSize: 20,
             fontWeight: FontWeight.w800,
             color: Colors.black87,
           ),
@@ -464,7 +468,6 @@ class _HomePageState extends State<HomePage> {
       ],
     );
   }
-
 }
 
 class _NotificationsSheet extends StatelessWidget {
@@ -840,7 +843,7 @@ class _CategoryButton extends StatelessWidget {
               category.label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: isSelected ? const Color(0xFF4A3DE0) : Colors.black87,
               ),
@@ -886,7 +889,11 @@ class _ListingCard extends StatefulWidget {
   final User currentUser;
   final bool compactLayout;
 
-  const _ListingCard({required this.product, required this.currentUser, required this.compactLayout});
+  const _ListingCard({
+    required this.product,
+    required this.currentUser,
+    required this.compactLayout,
+  });
 
   @override
   State<_ListingCard> createState() => _ListingCardState();

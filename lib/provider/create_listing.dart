@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:video_compress/video_compress.dart';
+import 'dart:io';
 
 import '../models/user_model.dart';
+import '../services/cloudinary_service.dart';
 
 class CreateListingPage extends StatefulWidget {
   final User user;
@@ -17,12 +23,13 @@ class _CreateListingPageState extends State<CreateListingPage> {
   final _priceController = TextEditingController();
   final _specificLocationController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _imageUrlController = TextEditingController();
-  final _videoUrlController = TextEditingController();
 
   final List<String> _imageUrls = [];
   String? _videoUrl;
   bool _isSubmitting = false;
+  bool _isUploadingImages = false;
+  bool _isUploadingVideo = false;
+  bool _isCompressingVideo = false;
 
   String? _selectedCategory;
   String _selectedLocation = 'Main campus';
@@ -53,8 +60,6 @@ class _CreateListingPageState extends State<CreateListingPage> {
     _priceController.dispose();
     _specificLocationController.dispose();
     _descriptionController.dispose();
-    _imageUrlController.dispose();
-    _videoUrlController.dispose();
     super.dispose();
   }
 
@@ -85,87 +90,178 @@ class _CreateListingPageState extends State<CreateListingPage> {
     );
   }
 
-  void _addImageUrl() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text("Enter Image URL"),
-          content: TextField(
-            controller: _imageUrlController,
-            decoration: const InputDecoration(hintText: "https://example.com/image.jpg"),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                if (_imageUrls.length >= 3) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("You can add up to 3 image URLs.")),
-                  );
-                  return;
-                }
+  Future<void> _pickAndUploadImages() async {
+    if (_imageUrls.length >= 3) {
+      await _showStatusCard(
+        title: 'Limit reached',
+        message: 'You can add up to 3 images.',
+      );
+      return;
+    }
 
-                final url = _imageUrlController.text.trim();
-                if (url.isNotEmpty && isValidUrl(url)) {
-                  setState(() {
-                    _imageUrls.add(url);
-                  });
-                  _imageUrlController.clear();
-                  Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a valid URL")),
-                  );
-                }
-              },
-              child: const Text("Add"),
-            ),
-          ],
-        );
-      },
-    );
+    final picker = ImagePicker();
+    final images = await picker.pickMultiImage();
+    if (images.isEmpty) return;
+
+    setState(() {
+      _isUploadingImages = true;
+    });
+    _showLoadingCard('Uploading images...');
+
+    try {
+      for (final image in images) {
+        if (_imageUrls.length >= 3) break;
+
+        debugPrint('Processing image: ${image.name}');
+        final String? url;
+
+        if (kIsWeb) {
+          final bytes = await image.readAsBytes();
+          debugPrint('Image file size: ${bytes.length / 1024 / 1024} MB');
+          url = await CloudinaryService.uploadImageBytes(
+            bytes: bytes,
+            filename: image.name,
+          );
+        } else {
+          var uploadPath = image.path;
+          try {
+            final compressedFile =
+                await FlutterImageCompress.compressAndGetFile(
+                  image.path,
+                  '${image.path}_compressed.jpg',
+                  quality: 80,
+                  minWidth: 1024,
+                  minHeight: 1024,
+                );
+            uploadPath = compressedFile?.path ?? image.path;
+          } catch (compressError) {
+            debugPrint('Compression error for ${image.name}: $compressError');
+          }
+
+          final fileToUpload = File(uploadPath);
+          debugPrint(
+            'Image file size: ${fileToUpload.lengthSync() / 1024 / 1024} MB',
+          );
+          url = await CloudinaryService.uploadImageFromPath(uploadPath);
+        }
+
+        if (url != null) {
+          debugPrint('Image uploaded successfully: $url');
+          final uploadedUrl = url;
+          setState(() {
+            _imageUrls.add(uploadedUrl);
+          });
+        } else {
+          debugPrint('Cloudinary returned null for image');
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await _showStatusCard(
+        title: _imageUrls.isEmpty ? 'Upload failed' : 'Success',
+        message: _imageUrls.isEmpty
+            ? 'Failed to upload images. Please check your internet and Cloudinary upload preset.'
+            : '${_imageUrls.length} image(s) uploaded successfully.',
+      );
+    } catch (e) {
+      debugPrint('Image upload error: $e');
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await _showStatusCard(title: 'Upload error', message: '$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImages = false;
+        });
+      }
+    }
   }
 
-  void _addVideoUrl() {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text("Enter Video URL"),
-          content: TextField(
-            controller: _videoUrlController,
-            decoration: const InputDecoration(hintText: "https://example.com/video.mp4"),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                final url = _videoUrlController.text.trim();
-                if (url.isEmpty || isValidUrl(url)) {
-                  setState(() {
-                    _videoUrl = url.isEmpty ? null : url;
-                  });
-                  _videoUrlController.clear();
-                  Navigator.pop(context);
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a valid URL")),
-                  );
-                }
-              },
-              child: const Text("Add"),
-            ),
-          ],
+  Future<void> _pickAndUploadVideo() async {
+    if (_isCompressingVideo) {
+      await _showStatusCard(
+        title: 'Please wait',
+        message: 'A video is already being processed.',
+      );
+      return;
+    }
+
+    final picker = ImagePicker();
+    final video = await picker.pickVideo(source: ImageSource.gallery);
+    if (video == null) return;
+
+    setState(() {
+      _isUploadingVideo = true;
+      _isCompressingVideo = true;
+    });
+    _showLoadingCard(kIsWeb ? 'Uploading video...' : 'Processing video...');
+
+    try {
+      final String? url;
+
+      if (kIsWeb) {
+        _isCompressingVideo = false;
+        final bytes = await video.readAsBytes();
+        debugPrint('Video file size: ${bytes.length / 1024 / 1024} MB');
+        url = await CloudinaryService.uploadVideoBytes(
+          bytes: bytes,
+          filename: video.name,
         );
-      },
-    );
+      } else {
+        var uploadPath = video.path;
+        try {
+          await VideoCompress.cancelCompression();
+          final compressedVideo = await VideoCompress.compressVideo(
+            video.path,
+            quality: VideoQuality.MediumQuality,
+            deleteOrigin: false,
+          );
+          uploadPath = compressedVideo?.file?.path ?? video.path;
+        } catch (compressError) {
+          debugPrint('Video compression error: $compressError');
+        } finally {
+          _isCompressingVideo = false;
+        }
+
+        final fileToUpload = File(uploadPath);
+        debugPrint(
+          'Video file size: ${fileToUpload.lengthSync() / 1024 / 1024} MB',
+        );
+        url = await CloudinaryService.uploadVideoFromPath(uploadPath);
+      }
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      if (url != null) {
+        setState(() {
+          _videoUrl = url;
+        });
+        await _showStatusCard(
+          title: 'Success',
+          message: 'Video uploaded successfully.',
+        );
+      } else {
+        await _showStatusCard(
+          title: 'Upload failed',
+          message:
+              'Failed to upload video. Please check your internet and Cloudinary upload preset.',
+        );
+      }
+    } catch (e) {
+      debugPrint('Video upload error: $e');
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      await _showStatusCard(title: 'Upload error', message: '$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingVideo = false;
+          _isCompressingVideo = false;
+        });
+      }
+    }
   }
 
   Future<void> _submitListing() async {
@@ -362,42 +458,50 @@ class _CreateListingPageState extends State<CreateListingPage> {
                   Expanded(
                     child: _MediaPickerCard(
                       title: 'Photos',
-                      actionLabel: _imageUrls.isEmpty
+                      actionLabel: _isUploadingImages
+                          ? 'Uploading...'
+                          : _imageUrls.isEmpty
                           ? 'Add Photos'
-                          : 'Edit Photos',
+                          : 'Add More',
                       countLabel: '${_imageUrls.length}/3',
-                      icon: Icons.add_rounded,
+                      icon: _isUploadingImages
+                          ? Icons.hourglass_top_rounded
+                          : Icons.add_rounded,
                       preview: _imageUrls.isEmpty
                           ? null
                           : Text(
-                              '${_imageUrls.length} URL${_imageUrls.length > 1 ? 's' : ''}',
+                              '${_imageUrls.length} uploaded',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
                               ),
                             ),
-                      onTap: _addImageUrl,
+                      onTap: _isUploadingImages ? null : _pickAndUploadImages,
                     ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: _MediaPickerCard(
                       title: 'Video',
-                      actionLabel: _videoUrl == null
+                      actionLabel: _isUploadingVideo
+                          ? 'Uploading...'
+                          : _videoUrl == null
                           ? 'Add Video'
                           : 'Change Video',
-                      countLabel: '1',
-                      icon: Icons.videocam_rounded,
+                      countLabel: _videoUrl == null ? '0/1' : '1/1',
+                      icon: _isUploadingVideo
+                          ? Icons.hourglass_top_rounded
+                          : Icons.videocam_rounded,
                       preview: _videoUrl == null
                           ? null
                           : const Text(
-                              '1 URL',
+                              '1 uploaded',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
                               ),
                             ),
-                      onTap: _addVideoUrl,
+                      onTap: _isUploadingVideo ? null : _pickAndUploadVideo,
                     ),
                   ),
                 ],
@@ -551,7 +655,7 @@ class _MediaPickerCard extends StatelessWidget {
   final String countLabel;
   final IconData icon;
   final Widget? preview;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _MediaPickerCard({
     required this.title,

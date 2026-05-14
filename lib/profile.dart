@@ -23,10 +23,17 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  late User _currentUser;
   bool _pushNotifications = false;
   late final Future<_ProfileStats> _statsFuture = _loadProfileStats();
 
-  bool get _isProvider => widget.user.role.trim().toLowerCase() == 'provider';
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = widget.user;
+  }
+
+  bool get _isProvider => _currentUser.role.trim().toLowerCase() == 'provider';
   bool get _isStudent => !_isProvider;
 
   Future<void> _signOut() async {
@@ -38,7 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<_ProfileStats> _loadProfileStats() async {
-    final userId = widget.user.uid.trim();
+    final userId = _currentUser.uid.trim();
     final favouritesSnapshot = await FirebaseFirestore.instance
         .collection('favorites')
         .where('userId', isEqualTo: userId)
@@ -96,10 +103,10 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.user.fullName.trim().isEmpty
+    final name = _currentUser.fullName.trim().isEmpty
         ? 'UniMarket User'
-        : widget.user.fullName.trim();
-    final email = widget.user.email.trim();
+        : _currentUser.fullName.trim();
+    final email = _currentUser.email.trim();
 
     final accountItems = <_MenuItem>[
       if (_isProvider)
@@ -153,14 +160,14 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: const Color(0xFFF4F5F7),
       bottomNavigationBar: _isProvider
           ? ProviderBottomNav(
-              user: widget.user,
+              user: _currentUser,
               currentIndex: 3,
-              homePage: HomePage(user: widget.user),
+              homePage: HomePage(user: _currentUser),
             )
           : StudentBottomNav(
-              user: widget.user,
+              user: _currentUser,
               currentIndex: 3,
-              homePage: HomePage(user: widget.user),
+              homePage: HomePage(user: _currentUser),
             ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -186,14 +193,25 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 32,
-                          backgroundColor: Color(0xFFF0F0F0),
-                          child: Icon(
-                            Icons.person,
-                            color: Color(0xFFB5B5B5),
-                            size: 36,
-                          ),
+                          backgroundColor: const Color(0xFFF0F0F0),
+                          backgroundImage:
+                              _currentUser.profilePicture?.trim().isNotEmpty ==
+                                  true
+                              ? NetworkImage(
+                                  _currentUser.profilePicture!.trim(),
+                                )
+                              : null,
+                          child:
+                              _currentUser.profilePicture?.trim().isEmpty !=
+                                  false
+                              ? const Icon(
+                                  Icons.person,
+                                  color: Color(0xFFB5B5B5),
+                                  size: 36,
+                                )
+                              : null,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -205,7 +223,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 33,
+                                  fontSize: 24,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -215,15 +233,15 @@ class _ProfilePageState extends State<ProfilePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 14,
                                   color: Color(0xFF5C5C5C),
                                 ),
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Member since ${widget.user.createdAt.year}',
+                                'Member since ${_currentUser.createdAt.year}',
                                 style: const TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 12,
                                   color: Color(0xFF8A8A8A),
                                 ),
                               ),
@@ -263,7 +281,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
               const Text(
                 'My Account',
-                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               Container(
@@ -285,7 +303,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
               const Text(
                 'Preferences',
-                style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
               ),
               const SizedBox(height: 12),
               Container(
@@ -326,7 +344,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   icon: const Icon(Icons.logout_rounded),
                   label: const Text(
                     'Sign Out',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFEF4444),
@@ -348,41 +366,49 @@ class _ProfilePageState extends State<ProfilePage> {
     if (title == 'Messages') {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => MessageListPage(currentUser: widget.user),
+          builder: (_) => MessageListPage(currentUser: _currentUser),
         ),
       );
       return;
     }
     if (title == 'My Purchases') {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MyPurchasesPage(user: widget.user)),
+        MaterialPageRoute(builder: (_) => MyPurchasesPage(user: _currentUser)),
       );
       return;
     }
     if (title == 'My Favourites') {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MyFavoritesPage(user: widget.user)),
+        MaterialPageRoute(builder: (_) => MyFavoritesPage(user: _currentUser)),
       );
       return;
     }
     if (title == 'My Listings') {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => MyListingsPage(user: widget.user)),
+        MaterialPageRoute(builder: (_) => MyListingsPage(user: _currentUser)),
       );
       return;
     }
     if (title == 'My Sales') {
-      Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => MySalesPage(user: widget.user)));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => MySalesPage(user: _currentUser)),
+      );
       return;
     }
     if (title == 'Account Settings') {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AccountSettingsPage(user: widget.user),
-        ),
-      );
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute(
+              builder: (_) => AccountSettingsPage(user: _currentUser),
+            ),
+          )
+          .then((updatedUser) {
+            if (updatedUser is User) {
+              setState(() {
+                _currentUser = updatedUser;
+              });
+            }
+          });
       return;
     }
   }
@@ -410,11 +436,11 @@ class _AccountItemTile extends StatelessWidget {
         ),
         title: Text(
           item.title,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
         subtitle: Text(
           item.subtitle,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF666666)),
         ),
         trailing: const Icon(
           Icons.chevron_right_rounded,

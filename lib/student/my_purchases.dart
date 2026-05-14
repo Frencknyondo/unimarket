@@ -339,77 +339,93 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                           ),
                           const SizedBox(height: 10),
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => MessageListPage(
-                                          currentUser: widget.user,
-                                          initialPeer: User(
-                                            uid: widget.buyerView
-                                                ? order.sellerId
-                                                : order.buyerId,
-                                            registrationNo: '',
-                                            email: widget.buyerView
-                                                ? order.sellerEmail
-                                                : order.buyerEmail,
-                                            fullName: widget.buyerView
-                                                ? order.sellerName
-                                                : order.buyerName,
-                                            password: '',
-                                            role: widget.buyerView
-                                                ? 'provider'
-                                                : 'student',
-                                            createdAt: DateTime.now(),
-                                          ),
+                              IconButton(
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 34,
+                                  minHeight: 34,
+                                ),
+                                tooltip: 'Message',
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => MessageListPage(
+                                        currentUser: widget.user,
+                                        initialPeer: User(
+                                          uid: widget.buyerView
+                                              ? order.sellerId
+                                              : order.buyerId,
+                                          registrationNo: '',
+                                          email: widget.buyerView
+                                              ? order.sellerEmail
+                                              : order.buyerEmail,
+                                          fullName: widget.buyerView
+                                              ? order.sellerName
+                                              : order.buyerName,
+                                          password: '',
+                                          role: widget.buyerView
+                                              ? 'provider'
+                                              : 'student',
+                                          createdAt: DateTime.now(),
                                         ),
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(
-                                    Icons.chat_bubble_outline_rounded,
-                                    size: 18,
-                                  ),
-                                  label: Text(
-                                    widget.buyerView
-                                        ? 'Message Seller'
-                                        : 'Message Buyer',
-                                  ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 20,
+                                  color: Color(0xFF3B82F6),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => OrderDetailsPage(
-                                          currentUser: widget.user,
-                                          order: order,
-                                          isSellerView: !widget.buyerView,
-                                        ),
+                              const SizedBox(width: 6),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => OrderDetailsPage(
+                                        currentUser: widget.user,
+                                        order: order,
+                                        isSellerView: !widget.buyerView,
                                       ),
-                                    );
-                                  },
-                                  icon: const Icon(
-                                    Icons.remove_red_eye_outlined,
-                                    size: 18,
+                                    ),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
                                   ),
-                                  label: const Text('View Details'),
+                                  minimumSize: const Size(40, 34),
+                                  foregroundColor: const Color(0xFF3B82F6),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'more..',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                               if (!widget.buyerView) ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton.icon(
-                                    onPressed: () => _showUpdateStatus(order),
-                                    icon: const Icon(
-                                      Icons.edit_outlined,
-                                      size: 18,
-                                    ),
-                                    label: const Text('Update Status'),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 34,
+                                    minHeight: 34,
+                                  ),
+                                  tooltip: 'Update',
+                                  onPressed: () => _showUpdateStatus(order),
+                                  icon: const Icon(
+                                    Icons.edit_outlined,
+                                    size: 20,
+                                    color: Color(0xFF16A34A),
                                   ),
                                 ),
                               ],
@@ -452,9 +468,9 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                 children: [
                   Text(
                     'Update Order Status',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   Text(
                     'Order #$orderNo',
