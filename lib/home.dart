@@ -129,7 +129,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         const Text(
                           'Welcome back,',
-                          style: TextStyle(fontSize: 13, color: Colors.black54),
+                          style: TextStyle(fontSize: 8, color: Colors.black54),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -137,7 +137,7 @@ class _HomePageState extends State<HomePage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 20,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: Colors.black87,
                           ),
@@ -194,7 +194,7 @@ class _HomePageState extends State<HomePage> {
                                       unreadCount > 9 ? '9+' : '$unreadCount',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 11,
+                                        fontSize: 7,
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
@@ -410,10 +410,10 @@ class _HomePageState extends State<HomePage> {
                                 SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   childAspectRatio: isCompactPhone
-                                      ? 0.58
-                                      : 0.62,
-                                  mainAxisSpacing: 16,
-                                  crossAxisSpacing: 14,
+                                      ? 0.60
+                                      : 0.64,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 10,
                                 ),
                             itemBuilder: (context, index) {
                               return _ListingCard(
@@ -497,7 +497,7 @@ class _NotificationsSheet extends StatelessWidget {
                     child: Text(
                       'Notifications',
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 18,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF111827),
                       ),
@@ -688,7 +688,7 @@ class _NotificationTile extends StatelessWidget {
                     Text(
                       notification.title,
                       style: const TextStyle(
-                        fontSize: 22,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                         color: Color(0xFF111827),
                       ),
@@ -942,7 +942,7 @@ class _ListingCardState extends State<_ListingCard> {
       child: Container(
         decoration: BoxDecoration(
           color: const Color(0xFFF5F6F8),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -954,10 +954,10 @@ class _ListingCardState extends State<_ListingCard> {
             ),
             Padding(
               padding: EdgeInsets.fromLTRB(
-                compactLayout ? 8 : 10,
-                compactLayout ? 8 : 10,
-                compactLayout ? 8 : 10,
-                compactLayout ? 8 : 10,
+                compactLayout ? 7 : 9,
+                compactLayout ? 6 : 9,
+                compactLayout ? 7 : 9,
+                compactLayout ? 7 : 9,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -965,11 +965,11 @@ class _ListingCardState extends State<_ListingCard> {
                   Row(
                     children: [
                       CircleAvatar(
-                        radius: compactLayout ? 9 : 10,
+                        radius: compactLayout ? 8 : 9,
                         backgroundColor: Color(0xFFE6E6E6),
                         child: Icon(
                           Icons.person,
-                          size: compactLayout ? 11 : 12,
+                          size: compactLayout ? 10 : 11,
                           color: Color(0xFF888888),
                         ),
                       ),
@@ -980,7 +980,7 @@ class _ListingCardState extends State<_ListingCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: compactLayout ? 12 : 13,
+                            fontSize: compactLayout ? 10 : 12,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF575757),
                           ),
@@ -1007,25 +1007,25 @@ class _ListingCardState extends State<_ListingCard> {
                               color: isFavorite
                                   ? const Color(0xFFE53935)
                                   : const Color(0xFF8A8A8A),
-                              size: compactLayout ? 18 : 20,
+                              size: compactLayout ? 16 : 18,
                             ),
                           );
                         },
                       ),
                     ],
                   ),
-                  SizedBox(height: compactLayout ? 6 : 8),
+                  SizedBox(height: compactLayout ? 4 : 6),
                   Text(
                     product.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: compactLayout ? 15 : 17,
+                      fontSize: compactLayout ? 13 : 16,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF1D1D1D),
                     ),
                   ),
-                  SizedBox(height: compactLayout ? 2 : 4),
+                  SizedBox(height: compactLayout ? 1 : 3),
                   Text(
                     product.description.trim().isEmpty
                         ? 'No description'
@@ -1033,36 +1033,36 @@ class _ListingCardState extends State<_ListingCard> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: compactLayout ? 12 : 13,
+                      fontSize: compactLayout ? 10 : 12,
                       color: Color(0xFF606060),
                     ),
                   ),
-                  SizedBox(height: compactLayout ? 6 : 8),
+                  SizedBox(height: compactLayout ? 4 : 6),
                   Text(
                     _formatPrice(product.price),
                     style: TextStyle(
-                      fontSize: compactLayout ? 16 : 18,
+                      fontSize: compactLayout ? 14 : 17,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF1E88E5),
                     ),
                   ),
                   if (hasVideo) ...[
-                    SizedBox(height: compactLayout ? 4 : 6),
+                    SizedBox(height: compactLayout ? 3 : 5),
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: compactLayout ? 8 : 10,
-                        vertical: compactLayout ? 5 : 6,
+                        horizontal: compactLayout ? 6 : 9,
+                        vertical: compactLayout ? 3 : 5,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF4A3DE0),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(9),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.videocam_rounded,
-                            size: compactLayout ? 12 : 14,
+                            size: compactLayout ? 10 : 13,
                             color: Colors.white,
                           ),
                           SizedBox(width: compactLayout ? 4 : 6),
@@ -1070,7 +1070,7 @@ class _ListingCardState extends State<_ListingCard> {
                             'Video available',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: compactLayout ? 10 : 11,
+                              fontSize: compactLayout ? 8 : 10,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1078,7 +1078,7 @@ class _ListingCardState extends State<_ListingCard> {
                       ),
                     ),
                   ],
-                  SizedBox(height: compactLayout ? 2 : 4),
+                  SizedBox(height: compactLayout ? 1 : 3),
                   Row(
                     children: [
                       Expanded(
@@ -1089,7 +1089,7 @@ class _ListingCardState extends State<_ListingCard> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: compactLayout ? 12 : 13,
+                            fontSize: compactLayout ? 10 : 12,
                             color: Color(0xFF4E4E4E),
                           ),
                         ),
@@ -1100,7 +1100,7 @@ class _ListingCardState extends State<_ListingCard> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: compactLayout ? 11 : 12,
+                          fontSize: compactLayout ? 9 : 11,
                           color: Color(0xFF8A8A8A),
                           fontWeight: FontWeight.w600,
                         ),
@@ -1179,11 +1179,11 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
     final hasNoImages = widget.images.isEmpty;
 
     return SizedBox(
-      height: widget.compactLayout ? 140 : 155,
+      height: widget.compactLayout ? 128 : 150,
       child: Stack(
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: PageView.builder(
               controller: _pageController,
               itemCount: hasNoImages ? 1 : widget.images.length,
@@ -1202,7 +1202,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                       children: const [
                         Icon(
                           Icons.play_circle_fill_rounded,
-                          size: 46,
+                          size: 34,
                           color: Color(0xFF4A3DE0),
                         ),
                         SizedBox(height: 10),
@@ -1210,7 +1210,7 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                           'Video only listing',
                           style: TextStyle(
                             color: Color(0xFF4A3DE0),
-                            fontSize: 14,
+                            fontSize: 11,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1238,19 +1238,19 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
             ),
           ),
           Positioned(
-            top: 8,
-            right: 8,
+            top: 6,
+            right: 6,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: Colors.black.withAlpha(150),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 hasNoImages ? 'Video' : '${_index + 1}/${widget.images.length}',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1272,15 +1272,15 @@ class _ProductsStateCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         message,
         style: const TextStyle(
-          fontSize: 14,
+          fontSize: 12,
           color: Colors.black54,
           height: 1.5,
         ),

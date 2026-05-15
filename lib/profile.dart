@@ -223,7 +223,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -233,7 +233,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 9,
                                   color: Color(0xFF5C5C5C),
                                 ),
                               ),
@@ -241,7 +241,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Text(
                                 'Member since ${_currentUser.createdAt.year}',
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 8,
                                   color: Color(0xFF8A8A8A),
                                 ),
                               ),

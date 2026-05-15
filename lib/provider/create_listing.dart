@@ -70,20 +70,21 @@ class _CreateListingPageState extends State<CreateListingPage> {
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
+      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 13),
+      isDense: true,
       filled: true,
       fillColor: const Color(0xFFF7F7F7),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF4A3DE0), width: 1.2),
       ),
       suffixIcon: suffixIcon,
@@ -534,12 +535,12 @@ class _CreateListingPageState extends State<CreateListingPage> {
                 ),
                 decoration: _inputDecoration('0.00').copyWith(
                   prefixIcon: const Padding(
-                    padding: EdgeInsets.fromLTRB(14, 14, 8, 14),
+                    padding: EdgeInsets.fromLTRB(12, 10, 6, 10),
                     child: Text(
                       'Tsh',
                       style: TextStyle(
                         color: Color(0xFF2F65FF),
-                        fontSize: 14,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

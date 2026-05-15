@@ -233,8 +233,8 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                 const Text('Order Summary', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
                   child: Column(
                     children: [
                       _SummaryRow(label: 'Item Price', value: itemPrice),
@@ -253,11 +253,11 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                 ),
                 const SizedBox(height: 14),
                 InkWell(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => setState(() => _agreeTerms = !_agreeTerms),
                   child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -270,7 +270,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         const Expanded(
                           child: Text(
                             'I agree to the Terms & Conditions and understand that this initiates a purchase request.',
-                            style: TextStyle(fontSize: 15, color: Color(0xFF4E4E4E), height: 1.4),
+                            style: TextStyle(fontSize: 13, color: Color(0xFF4E4E4E), height: 1.35),
                           ),
                         ),
                       ],
@@ -351,13 +351,13 @@ class _OptionCard extends StatelessWidget {
     final bgColor = selected ? const Color(0xFFF1F6FF) : Colors.white;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(9),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: borderColor, width: selected ? 1.6 : 1),
         ),
         child: Column(
@@ -365,28 +365,28 @@ class _OptionCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, size: 20, color: const Color(0xFF5A5A5A)),
+                Icon(icon, size: 17, color: const Color(0xFF5A5A5A)),
                 const Spacer(),
                 Icon(
                   selected ? Icons.radio_button_checked : Icons.radio_button_off,
                   color: selected ? const Color(0xFF2F65FF) : const Color(0xFFBDBDBD),
-                  size: 19,
+                  size: 17,
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF666666), height: 1.35),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.3),
             ),
             if (footer.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 footer,
                 style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 12,
                   color: Color(0xFF1E88E5),
                   fontWeight: FontWeight.w700,
                 ),
@@ -415,25 +415,26 @@ class _ChoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: selected ? const Color(0xFF2F65FF) : const Color(0xFFE5E5E5)),
         ),
         child: Row(
           children: [
-            Icon(icon, color: selected ? const Color(0xFF2F65FF) : const Color(0xFF6D6D6D)),
-            const SizedBox(width: 12),
+            Icon(icon, size: 19, color: selected ? const Color(0xFF2F65FF) : const Color(0xFF6D6D6D)),
+            const SizedBox(width: 9),
             Expanded(
-              child: Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             ),
             Icon(
               selected ? Icons.check_circle : Icons.radio_button_unchecked,
               color: selected ? const Color(0xFF2ECC71) : const Color(0xFFBDBDBD),
+              size: 19,
             ),
           ],
         ),
@@ -461,7 +462,7 @@ class _SummaryRow extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: emphasize ? 18 : 16,
+              fontSize: emphasize ? 15 : 13,
               color: const Color(0xFF5C5C5C),
               fontWeight: emphasize ? FontWeight.w800 : FontWeight.w500,
             ),
@@ -470,7 +471,7 @@ class _SummaryRow extends StatelessWidget {
         Text(
           value,
           style: TextStyle(
-            fontSize: emphasize ? 18 : 16,
+            fontSize: emphasize ? 15 : 13,
             fontWeight: FontWeight.w900,
             color: emphasize ? const Color(0xFF1E88E5) : Colors.black87,
           ),

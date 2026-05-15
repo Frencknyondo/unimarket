@@ -145,20 +145,21 @@ class _SignUpPageState extends State<SignUpPage> {
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
+      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 13),
+      isDense: true,
       filled: true,
       fillColor: const Color(0xFFF7F7F7),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF4A3DE0), width: 1.2),
       ),
       suffixIcon: suffixIcon,

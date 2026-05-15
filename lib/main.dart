@@ -30,69 +30,90 @@ class MyApp extends StatelessWidget {
           textTheme: GoogleFonts.poppinsTextTheme(baseTheme.textTheme)
               .copyWith(
                 displayLarge: GoogleFonts.poppins(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w700,
-                ),
-                displayMedium: GoogleFonts.poppins(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                ),
-                displaySmall: GoogleFonts.poppins(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                ),
-                headlineLarge: GoogleFonts.poppins(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
+                displayMedium: GoogleFonts.poppins(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                ),
+                displaySmall: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+                headlineLarge: GoogleFonts.poppins(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
                 headlineMedium: GoogleFonts.poppins(
-                  fontSize: 22,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
                 headlineSmall: GoogleFonts.poppins(
-                  fontSize: 20,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
                 titleLarge: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
                 titleMedium: GoogleFonts.poppins(
-                  fontSize: 16,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
                 titleSmall: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 10,
                   fontWeight: FontWeight.w600,
                 ),
                 bodyLarge: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w400,
                 ),
                 bodyMedium: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 10,
                   fontWeight: FontWeight.w400,
                 ),
                 bodySmall: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: 9,
                   fontWeight: FontWeight.w400,
                 ),
                 labelLarge: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: 9,
                   fontWeight: FontWeight.w600,
                 ),
               )
               .apply(bodyColor: Colors.black87, displayColor: Colors.black87),
           appBarTheme: baseTheme.appBarTheme.copyWith(
             titleTextStyle: GoogleFonts.poppins(
-              fontSize: 20,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
             toolbarTextStyle: GoogleFonts.poppins(
-              fontSize: 16,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
               color: Colors.white,
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 12,
+            ),
+            hintStyle: GoogleFonts.poppins(
+              color: const Color(0xFF9E9E9E),
+              fontSize: 13,
+            ),
+            labelStyle: GoogleFonts.poppins(fontSize: 13),
+            floatingLabelStyle: GoogleFonts.poppins(fontSize: 13),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
             ),
           ),
         );

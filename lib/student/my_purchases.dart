@@ -122,6 +122,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
               homePage: HomePage(user: widget.user),
             ),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
@@ -217,7 +218,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                 }
 
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                   itemBuilder: (context, index) {
                     final order = filtered[index];
                     final orderNo = order.orderId.substring(
@@ -229,10 +230,10 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                         : order.buyerName;
 
                     return Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,6 +243,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                               const Icon(
                                 Icons.timelapse_rounded,
                                 color: Color(0xFF9CA3AF),
+                                size: 18,
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -253,12 +255,12 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                               const Spacer(),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
+                                  horizontal: 8,
+                                  vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
                                   color: _statusBg(order.status),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(9),
                                 ),
                                 child: Text(
                                   _statusLabel(order.status),
@@ -276,13 +278,14 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
                                 child: SizedBox(
-                                  width: 58,
-                                  height: 58,
+                                  width: 50,
+                                  height: 50,
                                   child: order.primaryImage.isEmpty
                                       ? Container(
                                           color: const Color(0xFFE5E7EB),
                                           child: const Icon(
                                             Icons.image_not_supported_outlined,
+                                            size: 20,
                                           ),
                                         )
                                       : Image.network(
@@ -291,7 +294,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                         ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -301,14 +304,14 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
-                                        fontSize: 17,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
                                     Text(
                                       _formatMoney(order.price, order.currency),
                                       style: const TextStyle(
-                                        fontSize: 18,
+                                        fontSize: 15,
                                         color: Color(0xFF1E88E5),
                                         fontWeight: FontWeight.w900,
                                       ),
@@ -345,8 +348,8 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
-                                  minWidth: 34,
-                                  minHeight: 34,
+                                  minWidth: 30,
+                                  minHeight: 30,
                                 ),
                                 tooltip: 'Message',
                                 onPressed: () {
@@ -377,7 +380,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                 },
                                 icon: const Icon(
                                   Icons.chat_bubble_outline_rounded,
-                                  size: 20,
+                                  size: 18,
                                   color: Color(0xFF3B82F6),
                                 ),
                               ),
@@ -417,14 +420,14 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(
-                                    minWidth: 34,
-                                    minHeight: 34,
+                                    minWidth: 30,
+                                    minHeight: 30,
                                   ),
                                   tooltip: 'Update',
                                   onPressed: () => _showUpdateStatus(order),
                                   icon: const Icon(
                                     Icons.edit_outlined,
-                                    size: 20,
+                                    size: 18,
                                     color: Color(0xFF16A34A),
                                   ),
                                 ),
@@ -524,12 +527,12 @@ class _OrdersListBaseState extends State<OrdersListPage> {
         },
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: isSelected
                 ? const Color(0xFFEAF4FF)
                 : const Color(0xFFF6F7F8),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
@@ -540,12 +543,13 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                 color: isSelected
                     ? const Color(0xFF3B82F6)
                     : const Color(0xFF9CA3AF),
+                size: 20,
               ),
               const SizedBox(width: 10),
               Text(
                 '${status[0].toUpperCase()}${status.substring(1)}',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                 ),
               ),
