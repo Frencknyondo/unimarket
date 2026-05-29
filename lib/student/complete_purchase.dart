@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/product_listing.dart';
 import '../models/user_model.dart';
+import '../services/notifications_service.dart';
 import 'my_purchases.dart';
 
 enum _DeliveryOption { campusPickup, delivery }
@@ -23,12 +24,22 @@ class CompletePurchasePage extends StatefulWidget {
 }
 
 class _CompletePurchasePageState extends State<CompletePurchasePage> {
+  final NotificationsService _notificationsService = NotificationsService();
   _DeliveryOption _selectedDelivery = _DeliveryOption.campusPickup;
   _ContactMethod _selectedContact = _ContactMethod.whatsapp;
   bool _agreeTerms = false;
   bool _isSubmitting = false;
+  int _quantity = 1;
 
   String _formatTsh(double value) => 'Tsh${value.round()}';
+
+  double get _totalPrice => widget.product.price * _quantity;
+
+  void _updateQuantity(int change) {
+    final nextQuantity = _quantity + change;
+    if (nextQuantity < 1) return;
+    setState(() => _quantity = nextQuantity);
+  }
 
   Future<void> _confirmPurchase() async {
     if (_isSubmitting || !_agreeTerms) return;
@@ -36,6 +47,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
 
     final product = widget.product;
     final buyer = widget.currentUser;
+    final totalPrice = _totalPrice;
     final deliveryOption =
         _selectedDelivery == _DeliveryOption.campusPickup ? 'Campus Pickup' : 'Delivery';
     final deliveryFeeLabel =
@@ -56,7 +68,10 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
           'video': product.video,
           'primaryImage': product.primaryImage,
           'images': product.images,
-          'price': product.price,
+          'unitPrice': product.price,
+          'quantity': _quantity,
+          'totalPrice': totalPrice,
+          'price': totalPrice,
           'currency': 'Tsh',
           'buyerId': buyer.uid,
           'buyerName': buyer.fullName.trim(),
@@ -72,6 +87,23 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
+
+        await _notificationsService.createNotification(
+          userId: buyer.uid,
+          title: 'Order Placed',
+          message:
+              'You placed an order for "${product.title.trim()}". Waiting for seller confirmation.',
+          type: 'order_placed',
+          orderId: orderRef.id,
+        );
+        await _notificationsService.createNotification(
+          userId: product.sellerId,
+          title: 'New Order',
+          message:
+              '${buyer.fullName.trim()} placed an order for "${product.title.trim()}".',
+          type: 'order_received',
+          orderId: orderRef.id,
+        );
 
         if (!mounted) return;
         
@@ -115,6 +147,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
   Widget build(BuildContext context) {
     final product = widget.product;
     final itemPrice = _formatTsh(product.price);
+    final totalPrice = _formatTsh(_totalPrice);
     final confirmEnabled = _agreeTerms && !_isSubmitting;
 
     return Scaffold(
@@ -135,7 +168,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Item Summary', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                const Text('Item Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -160,13 +193,19 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                            Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                             const SizedBox(height: 4),
-                            Text(itemPrice, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1E88E5))),
+                            Text(itemPrice, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF1E88E5))),
                             const SizedBox(height: 2),
                             Text(
                               product.sellerName.trim().isEmpty ? 'Unknown seller' : product.sellerName.trim(),
-                              style: const TextStyle(fontSize: 16, color: Color(0xFF696969)),
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF696969)),
+                            ),
+                            const SizedBox(height: 8),
+                            _QuantityStepper(
+                              quantity: _quantity,
+                              onDecrease: () => _updateQuantity(-1),
+                              onIncrease: () => _updateQuantity(1),
                             ),
                           ],
                         ),
@@ -175,7 +214,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                const Text('Delivery Option', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                const Text('Delivery Option', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -203,7 +242,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   ],
                 ),
                 const SizedBox(height: 22),
-                const Text('Payment Method', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                const Text('Payment Method', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 _OptionCard(
                   title: 'Pay with Cash',
@@ -214,7 +253,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   onTap: () {},
                 ),
                 const SizedBox(height: 22),
-                const Text('Contact Method', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                const Text('Contact Method', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 _ChoiceTile(
                   title: 'WhatsApp',
@@ -230,7 +269,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   onTap: () => setState(() => _selectedContact = _ContactMethod.inApp),
                 ),
                 const SizedBox(height: 22),
-                const Text('Order Summary', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+                const Text('Order Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -238,6 +277,8 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   child: Column(
                     children: [
                       _SummaryRow(label: 'Item Price', value: itemPrice),
+                      const SizedBox(height: 8),
+                      _SummaryRow(label: 'Quantity', value: 'x$_quantity'),
                       const SizedBox(height: 8),
                       _SummaryRow(
                         label: 'Delivery Fee',
@@ -247,7 +288,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Divider(height: 1),
                       ),
-                      _SummaryRow(label: 'Total Amount', value: itemPrice, emphasize: true),
+                      _SummaryRow(label: 'Total Amount', value: totalPrice, emphasize: true),
                     ],
                   ),
                 ),
@@ -302,7 +343,7 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : const Icon(Icons.lock_outline_rounded),
-                      label: Text('Confirm Purchase - $itemPrice'),
+                      label: Text('Confirm Purchase - $totalPrice'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: confirmEnabled ? const Color(0xFF2F65FF) : const Color(0xFFD0D0D0),
                         foregroundColor: Colors.white,
@@ -323,6 +364,86 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuantityStepper extends StatelessWidget {
+  final int quantity;
+  final VoidCallback onDecrease;
+  final VoidCallback onIncrease;
+
+  const _QuantityStepper({
+    required this.quantity,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 92,
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _QuantityButton(
+            icon: Icons.remove_rounded,
+            onTap: quantity > 1 ? onDecrease : null,
+          ),
+          Text(
+            '$quantity',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF111827),
+            ),
+          ),
+          _QuantityButton(icon: Icons.add_rounded, onTap: onIncrease),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuantityButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _QuantityButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: 27,
+        height: 27,
+        decoration: BoxDecoration(
+          color: enabled ? const Color(0xFF4A3DE0) : const Color(0xFFE6E6E6),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? Colors.white : const Color(0xFF9A9A9A),
+        ),
       ),
     );
   }

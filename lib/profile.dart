@@ -8,8 +8,10 @@ import 'layout/student_bottom_nav.dart';
 import 'models/user_model.dart';
 import 'message_list.dart';
 import 'my_favorites.dart';
+import 'provider/ads.dart';
 import 'provider/my_listings.dart';
 import 'provider/my_sales.dart';
+import 'services/auth_service.dart';
 import 'signin.dart';
 import 'student/my_purchases.dart';
 
@@ -37,6 +39,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool get _isStudent => !_isProvider;
 
   Future<void> _signOut() async {
+    await AuthService().clearSession();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const SignInPage()),
@@ -116,6 +119,14 @@ class _ProfilePageState extends State<ProfilePage> {
           icon: Icons.list_alt_rounded,
           iconBg: Color(0xFFE7F2FF),
           iconColor: Color(0xFF2F65FF),
+        ),
+      if (_isProvider)
+        const _MenuItem(
+          title: 'Ads',
+          subtitle: 'Create homepage banner ads',
+          icon: Icons.campaign_rounded,
+          iconBg: Color(0xFFEDEBFF),
+          iconColor: Color(0xFF4A3DE0),
         ),
       const _MenuItem(
         title: 'My Favourites',
@@ -386,6 +397,12 @@ class _ProfilePageState extends State<ProfilePage> {
     if (title == 'My Listings') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => MyListingsPage(user: _currentUser)),
+      );
+      return;
+    }
+    if (title == 'Ads') {
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => AdsPage(user: _currentUser)),
       );
       return;
     }

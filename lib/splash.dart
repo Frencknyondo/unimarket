@@ -1,7 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'Admin/admindashboard.dart';
+import 'home.dart';
 import 'onboarding.dart';
+import 'services/auth_service.dart';
+import 'signin.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -15,10 +20,21 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenOnboarding = prefs.getBool('onboarding_seen') ?? false;
+      final savedUser = await AuthService().getSavedSession();
+      if (!mounted) return;
+
+      final destination = savedUser == null
+          ? (hasSeenOnboarding ? const SignInPage() : const OnboardingPage())
+          : savedUser.role.trim().toLowerCase() == 'admin'
+          ? const AdminDashboardPage()
+          : HomePage(user: savedUser);
+
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const OnboardingPage()),
+        MaterialPageRoute(builder: (_) => destination),
       );
     });
   }
@@ -106,5 +122,4 @@ class _SplashPageState extends State<SplashPage> {
       ],
     );
   }
-
 }

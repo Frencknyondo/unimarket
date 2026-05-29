@@ -74,7 +74,8 @@ class OrderDetailsPage extends StatelessWidget {
         ? 'Unknown seller'
         : order.sellerName.trim();
     final personName = isSellerView ? buyerName : sellerName;
-    final amount = _formatMoney(order.price, order.currency);
+    final unitAmount = _formatMoney(order.unitPrice, order.currency);
+    final amount = _formatMoney(order.totalPrice, order.currency);
     final statusColor = _statusColor(order.status);
 
     return Scaffold(
@@ -246,7 +247,7 @@ class OrderDetailsPage extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          amount,
+                          unitAmount,
                           style: const TextStyle(
                             fontSize: 16,
                             color: Color(0xFF1E88E5),
@@ -352,7 +353,11 @@ class OrderDetailsPage extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _SummaryRow(label: 'Item Price', value: amount),
+                  _SummaryRow(label: 'Item Price', value: unitAmount),
+                  if (order.quantity > 1) ...[
+                    const SizedBox(height: 8),
+                    _SummaryRow(label: 'Quantity', value: 'x${order.quantity}'),
+                  ],
                   const SizedBox(height: 8),
                   _SummaryRow(
                     label: 'Delivery Fee',

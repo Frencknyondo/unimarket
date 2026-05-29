@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
@@ -63,6 +66,53 @@ class _ListingDetailsPageState extends State<ListingDetailsPage> {
     }
   }
 
+  String _shareText() {
+    final product = widget.product;
+    final description = product.description.trim().isEmpty
+        ? 'No description provided'
+        : product.description.trim();
+
+    return [
+      product.title.trim().isEmpty ? 'UniMarket product' : product.title.trim(),
+      'Price: ${_formatPrice(product.price)}',
+      'Description: $description',
+    ].join('\n');
+  }
+
+  Future<void> _shareProduct() async {
+    final product = widget.product;
+    final imageUrl = product.primaryImage.trim();
+    final text = _shareText();
+
+    try {
+      if (imageUrl.isEmpty) {
+        await Share.share(text);
+        return;
+      }
+
+      final response = await http.get(Uri.parse(imageUrl));
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        await Share.share(text);
+        return;
+      }
+
+      final file = File(
+        '${Directory.systemTemp.path}/unimarket_${product.productId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      await file.writeAsBytes(response.bodyBytes);
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: text,
+        subject: product.title.trim().isEmpty
+            ? 'UniMarket product'
+            : product.title.trim(),
+      );
+    } catch (_) {
+      await Share.share(text);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -121,7 +171,7 @@ class _ListingDetailsPageState extends State<ListingDetailsPage> {
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
               icon: const Icon(Icons.share_rounded, color: Colors.black87),
-              onPressed: () {},
+              onPressed: _shareProduct,
             ),
           ),
         ],

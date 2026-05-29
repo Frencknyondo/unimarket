@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'signin.dart';
 import 'signup.dart';
@@ -56,6 +57,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
+  Future<void> _finishOnboarding(Widget page) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_seen', true);
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => page),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,11 +94,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const SignUpPage(),
-                                ),
-                              );
+                              _finishOnboarding(const SignUpPage());
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF2F65FF),
@@ -104,11 +111,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const SignInPage(),
-                                ),
-                              );
+                              _finishOnboarding(const SignInPage());
                             },
                             style: OutlinedButton.styleFrom(
                               backgroundColor: Colors.white,

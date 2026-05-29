@@ -14,6 +14,9 @@ class OrderModel {
   final String primaryImage;
   final List<String> images;
   final double price;
+  final double unitPrice;
+  final double totalPrice;
+  final int quantity;
   final String currency;
   final String paymentMethod;
   final String deliveryOption;
@@ -37,6 +40,9 @@ class OrderModel {
     required this.primaryImage,
     required this.images,
     required this.price,
+    required this.unitPrice,
+    required this.totalPrice,
+    required this.quantity,
     required this.currency,
     required this.paymentMethod,
     required this.deliveryOption,
@@ -60,6 +66,12 @@ class OrderModel {
 
     final primary = (map['primaryImage'] as String?)?.trim() ?? '';
 
+    final quantity = (map['quantity'] as num?)?.toInt() ?? 1;
+    final price = (map['price'] as num?)?.toDouble() ?? 0;
+    final unitPrice = (map['unitPrice'] as num?)?.toDouble() ??
+        (quantity > 0 ? price / quantity : price);
+    final totalPrice = (map['totalPrice'] as num?)?.toDouble() ?? price;
+
     return OrderModel(
       orderId: (map['orderId'] as String?) ?? '',
       buyerId: (map['buyerId'] as String?) ?? '',
@@ -73,7 +85,10 @@ class OrderModel {
       category: (map['category'] as String?) ?? '',
       primaryImage: primary.isNotEmpty ? primary : (images.isNotEmpty ? images.first : ''),
       images: images,
-      price: (map['price'] as num?)?.toDouble() ?? 0,
+      price: totalPrice,
+      unitPrice: unitPrice,
+      totalPrice: totalPrice,
+      quantity: quantity < 1 ? 1 : quantity,
       currency: (map['currency'] as String?)?.trim().isNotEmpty == true
           ? (map['currency'] as String)
           : 'Tsh',

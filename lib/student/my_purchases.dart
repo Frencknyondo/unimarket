@@ -133,24 +133,6 @@ class _OrdersListBaseState extends State<OrdersListPage> {
             color: Colors.black87,
           ),
         ),
-        actions: [
-          if (!widget.buyerView)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: FilledButton.icon(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.account_balance_wallet_outlined,
-                  size: 18,
-                ),
-                label: const Text('Wallet'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF3B82F6),
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-        ],
       ),
       body: Column(
         children: [
@@ -509,15 +491,14 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                 'updatedAt': FieldValue.serverTimestamp(),
               });
 
-          if (!widget.buyerView &&
-              status == 'confirmed' &&
-              previousStatus != 'confirmed') {
-            await _notificationsService.createNotification(
-              userId: order.buyerId,
-              title: 'Order Confirmed',
+          if (!widget.buyerView && status != previousStatus) {
+            final label = _statusLabel(status);
+            await _notificationsService.createNotificationsForUsers(
+              userIds: [order.buyerId, order.sellerId],
+              title: 'Order $label',
               message:
-                  'Your order for "${order.productTitle}" has been confirmed by ${order.sellerName}.',
-              type: 'order_confirmed',
+                  'Order for "${order.productTitle}" is now ${label.toLowerCase()}.',
+              type: 'order_$status',
               orderId: order.orderId,
             );
           }

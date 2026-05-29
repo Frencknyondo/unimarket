@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_model.dart';
 
@@ -11,6 +13,32 @@ class AuthService {
   static const String _adminDocId = 'system_admin';
   static const String _adminEmail = 'admin@example.com';
   static const String _adminPassword = 'Admin Admin';
+  static const String _sessionUserKey = 'session_user';
+
+  Future<void> saveSession(User user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_sessionUserKey, jsonEncode(user.toMap()));
+  }
+
+  Future<User?> getSavedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawUser = prefs.getString(_sessionUserKey);
+    if (rawUser == null || rawUser.trim().isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(rawUser);
+      if (decoded is! Map<String, dynamic>) return null;
+      return User.fromMap(decoded);
+    } catch (_) {
+      await clearSession();
+      return null;
+    }
+  }
+
+  Future<void> clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionUserKey);
+  }
 
   Stream<List<User>> usersStream() {
     return _firestore
@@ -363,6 +391,8 @@ class AuthService {
           'message': 'Incorrect password',
         };
       }
+
+      await saveSession(user);
 
       return {
         'success': true,

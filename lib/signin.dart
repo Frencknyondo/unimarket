@@ -241,13 +241,6 @@ class _SignInPageState extends State<SignInPage> {
                       fallbackLabel: 'G',
                       fallbackColor: Color(0xFFDB4437),
                     ),
-                    SizedBox(width: 18),
-                    _NetworkSocialButton(
-                      imageUrl:
-                          'https://img.icons8.com/color/96/whatsapp--v1.png',
-                      fallbackIcon: Icons.chat_bubble_rounded,
-                      fallbackColor: Color(0xFF25D366),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 48),
@@ -288,13 +281,11 @@ class _SignInPageState extends State<SignInPage> {
 class _NetworkSocialButton extends StatelessWidget {
   final String imageUrl;
   final String? fallbackLabel;
-  final IconData? fallbackIcon;
   final Color fallbackColor;
 
   const _NetworkSocialButton({
     required this.imageUrl,
     this.fallbackLabel,
-    this.fallbackIcon,
     required this.fallbackColor,
   });
 
@@ -337,11 +328,6 @@ class _NetworkSocialButton extends StatelessWidget {
       );
     }
 
-    return Center(
-      child: Opacity(
-        opacity: opacity,
-        child: Icon(fallbackIcon, color: fallbackColor, size: 24),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }

@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../signin.dart';
+import 'manage_ads.dart';
 import 'manage_users.dart';
+import 'send_notifications.dart';
 
 class AdminDashboardPage extends StatelessWidget {
   const AdminDashboardPage({super.key});
+
+  Future<void> _signOut(BuildContext context) async {
+    await AuthService().clearSession();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SignInPage()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,6 +30,14 @@ class AdminDashboardPage extends StatelessWidget {
           'Admin Dashboard',
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Logout',
+            onPressed: () => _signOut(context),
+            icon: const Icon(Icons.logout_rounded),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(20),
@@ -67,6 +88,30 @@ class AdminDashboardPage extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => const ManageUsersPage(),
                   ),
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            _AdminTile(
+              title: 'Send Notifications',
+              subtitle: 'Send updates to everyone or one user.',
+              icon: Icons.notifications_active_rounded,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const SendNotificationsPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 14),
+            _AdminTile(
+              title: 'Ads Management',
+              subtitle: 'Approve, reject, and preview banner ads.',
+              icon: Icons.campaign_rounded,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ManageAdsPage()),
                 );
               },
             ),

@@ -2,14 +2,17 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'layout/provider_bottom_nav.dart';
 import 'layout/student_bottom_nav.dart';
 import 'searching.dart';
+import 'models/ad_model.dart';
 import 'models/product_listing.dart';
 import 'models/user_model.dart';
 import 'services/favorites_service.dart';
 import 'services/notifications_service.dart';
+import 'student/ad_details.dart';
 import 'student/listing_details.dart';
 
 class HomePage extends StatefulWidget {
@@ -232,6 +235,8 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 20),
 
+              const _HomeAdsBanner(),
+              const SizedBox(height: 22),
               _sectionHeader(
                 'Category',
                 actionLabel: _showAllCategories ? 'See less' : 'See All',
@@ -398,32 +403,9 @@ class _HomePageState extends State<HomePage> {
                         return _ProductsStateCard(message: message);
                       }
 
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isCompactPhone = constraints.maxWidth < 380;
-
-                          return GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filteredListings.length,
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  childAspectRatio: isCompactPhone
-                                      ? 0.60
-                                      : 0.64,
-                                  mainAxisSpacing: 12,
-                                  crossAxisSpacing: 10,
-                                ),
-                            itemBuilder: (context, index) {
-                              return _ListingCard(
-                                product: filteredListings[index],
-                                currentUser: widget.user,
-                                compactLayout: true,
-                              );
-                            },
-                          );
-                        },
+                      return _MasonryProductGrid(
+                        listings: filteredListings,
+                        currentUser: widget.user,
                       );
                     },
                   );
@@ -596,6 +578,150 @@ class _NotificationsSheet extends StatelessWidget {
   }
 }
 
+class _HomeAdsBanner extends StatelessWidget {
+  const _HomeAdsBanner();
+
+  Future<void> _openWhatsApp(BuildContext context, AdModel ad) async {
+    final phone = ad.phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (phone.isEmpty) return;
+    final normalized = phone.startsWith('+') ? phone.substring(1) : phone;
+    final uri = Uri.parse(
+      'https://wa.me/$normalized?text=${Uri.encodeComponent('Hello, I saw your ad on UniMarket: ${ad.title}')}',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('ads')
+          .where('status', isEqualTo: 'approved')
+          .snapshots(),
+      builder: (context, snapshot) {
+        final ads = (snapshot.data?.docs ?? const [])
+            .map((doc) => AdModel.fromFirestore(doc))
+            .where((ad) => ad.isActive)
+            .toList()
+          ..sort((a, b) {
+            final aDate = a.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            final bDate = b.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+            return bDate.compareTo(aDate);
+          });
+
+        if (ads.isEmpty) return const SizedBox.shrink();
+        final ad = ads.first;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => AdDetailsPage(ad: ad)),
+            );
+          },
+          child: Container(
+            height: 164,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF2458D8),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (ad.imageUrl.isNotEmpty)
+                  Image.network(ad.imageUrl, fit: BoxFit.cover),
+                if (ad.imageUrl.isEmpty)
+                  Container(color: const Color(0xCC2458D8)),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        ad.category.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        ad.businessName.isEmpty ? ad.title : ad.businessName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        ad.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      InkWell(
+                        onTap: () => _openWhatsApp(context, ad),
+                        borderRadius: BorderRadius.circular(9),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Text(
+                            ad.ctaLabel,
+                            style: const TextStyle(
+                              color: Color(0xFF2458D8),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Positioned(
+                  top: 12,
+                  right: 14,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0x5520247C),
+                      borderRadius: BorderRadius.all(Radius.circular(6)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Text(
+                        'AD',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _NotificationTile extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
@@ -604,10 +730,24 @@ class _NotificationTile extends StatelessWidget {
 
   IconData _iconForType() {
     switch (notification.type) {
+      case 'admin':
+        return Icons.campaign_rounded;
+      case 'ad_submitted':
+        return Icons.hourglass_top_rounded;
+      case 'ad_approved':
+        return Icons.verified_rounded;
+      case 'ad_rejected':
+        return Icons.cancel_rounded;
+      case 'order_placed':
+        return Icons.shopping_bag_rounded;
       case 'order_confirmed':
         return Icons.verified_rounded;
       case 'order_received':
         return Icons.shopping_cart_checkout_rounded;
+      case 'order_completed':
+        return Icons.task_alt_rounded;
+      case 'order_cancelled':
+        return Icons.cancel_rounded;
       case 'listing_created':
         return Icons.campaign_rounded;
       default:
@@ -617,10 +757,24 @@ class _NotificationTile extends StatelessWidget {
 
   Color _iconColor() {
     switch (notification.type) {
+      case 'admin':
+        return const Color(0xFF4A3DE0);
+      case 'ad_submitted':
+        return const Color(0xFFF59E0B);
+      case 'ad_approved':
+        return const Color(0xFF22C55E);
+      case 'ad_rejected':
+        return const Color(0xFFEF4444);
+      case 'order_placed':
+        return const Color(0xFF2563EB);
       case 'order_confirmed':
         return const Color(0xFFF59E0B);
       case 'order_received':
         return const Color(0xFF2563EB);
+      case 'order_completed':
+        return const Color(0xFF22C55E);
+      case 'order_cancelled':
+        return const Color(0xFFEF4444);
       case 'listing_created':
         return const Color(0xFFA855F7);
       default:
@@ -825,8 +979,8 @@ class _CategoryButton extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: 62,
-              height: 62,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF4A3DE0)
@@ -835,6 +989,7 @@ class _CategoryButton extends StatelessWidget {
               ),
               child: Icon(
                 category.icon,
+                size: 20,
                 color: isSelected ? Colors.white : const Color(0xFF4A3DE0),
               ),
             ),
@@ -880,6 +1035,54 @@ class _FilterChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MasonryProductGrid extends StatelessWidget {
+  final List<ProductListing> listings;
+  final User currentUser;
+
+  const _MasonryProductGrid({
+    required this.listings,
+    required this.currentUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final leftItems = <ProductListing>[];
+    final rightItems = <ProductListing>[];
+
+    for (var index = 0; index < listings.length; index++) {
+      if (index.isEven) {
+        leftItems.add(listings[index]);
+      } else {
+        rightItems.add(listings[index]);
+      }
+    }
+
+    Widget column(List<ProductListing> items) {
+      return Column(
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            _ListingCard(
+              product: items[index],
+              currentUser: currentUser,
+              compactLayout: true,
+            ),
+            if (index != items.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: column(leftItems)),
+        const SizedBox(width: 10),
+        Expanded(child: column(rightItems)),
+      ],
     );
   }
 }
@@ -1134,14 +1337,47 @@ class _ListingImageCarousel extends StatefulWidget {
 
 class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   late final PageController _pageController;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
   Timer? _timer;
   int _index = 0;
+  double _aspectRatio = 1;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
+    _resolveAspectRatio();
     _startAutoSlide();
+  }
+
+  void _resolveAspectRatio() {
+    final oldListener = _imageStreamListener;
+    if (oldListener != null) {
+      _imageStream?.removeListener(oldListener);
+    }
+    _imageStream = null;
+    _imageStreamListener = null;
+
+    if (widget.images.isEmpty) {
+      _aspectRatio = 1;
+      return;
+    }
+
+    final provider = NetworkImage(widget.images.first);
+    final stream = provider.resolve(const ImageConfiguration());
+    final listener = ImageStreamListener((info, _) {
+      final width = info.image.width;
+      final height = info.image.height;
+      if (!mounted || height == 0) return;
+      setState(() {
+        _aspectRatio = (width / height).clamp(0.56, 1.35).toDouble();
+      });
+    });
+
+    _imageStream = stream;
+    _imageStreamListener = listener;
+    stream.addListener(listener);
   }
 
   void _startAutoSlide() {
@@ -1163,13 +1399,23 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.images.length != widget.images.length) {
       _index = 0;
+      _resolveAspectRatio();
       _startAutoSlide();
+    } else if (oldWidget.images.isNotEmpty &&
+        widget.images.isNotEmpty &&
+        oldWidget.images.first != widget.images.first) {
+      _index = 0;
+      _resolveAspectRatio();
     }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    final listener = _imageStreamListener;
+    if (listener != null) {
+      _imageStream?.removeListener(listener);
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -1178,8 +1424,8 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
   Widget build(BuildContext context) {
     final hasNoImages = widget.images.isEmpty;
 
-    return SizedBox(
-      height: widget.compactLayout ? 128 : 150,
+    return AspectRatio(
+      aspectRatio: hasNoImages ? 1 : _aspectRatio,
       child: Stack(
         children: [
           ClipRRect(
@@ -1222,7 +1468,8 @@ class _ListingImageCarouselState extends State<_ListingImageCarousel> {
                 return Image.network(
                   widget.images[index],
                   width: double.infinity,
-                  fit: BoxFit.cover,
+                  height: double.infinity,
+                  fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color: const Color(0xFFE7E7E7),

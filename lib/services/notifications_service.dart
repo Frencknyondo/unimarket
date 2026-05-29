@@ -93,6 +93,36 @@ class NotificationsService {
     });
   }
 
+  Future<void> createNotificationsForUsers({
+    required Iterable<String> userIds,
+    required String title,
+    required String message,
+    String type = 'general',
+    String orderId = '',
+  }) async {
+    final cleanUserIds = userIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    if (cleanUserIds.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final userId in cleanUserIds) {
+      final ref = _firestore.collection(_notificationsCollection).doc();
+      batch.set(ref, {
+        'userId': userId,
+        'title': title.trim(),
+        'message': message.trim(),
+        'type': type.trim().isEmpty ? 'general' : type.trim(),
+        'orderId': orderId.trim(),
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
   Future<void> markAsRead(String notificationId) async {
     if (notificationId.trim().isEmpty) return;
 
