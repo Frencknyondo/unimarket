@@ -68,17 +68,19 @@ class ManageAdsPage extends StatelessWidget {
     if (status == 'approved') {
       final now = DateTime.now();
       data['approvedAt'] = FieldValue.serverTimestamp();
-      data['expiresAt'] = Timestamp.fromDate(now.add(Duration(days: ad.durationDays)));
+      data['expiresAt'] = Timestamp.fromDate(
+        now.add(Duration(days: ad.durationDays)),
+      );
       data['rejectionReason'] = '';
     } else {
       data['rejectionReason'] = rejectionReason.trim();
     }
 
     try {
-      await FirebaseFirestore.instance.collection('ads').doc(ad.id).set(
-        data,
-        SetOptions(merge: true),
-      );
+      await FirebaseFirestore.instance
+          .collection('ads')
+          .doc(ad.id)
+          .set(data, SetOptions(merge: true));
 
       try {
         await notificationsService.createNotification(
@@ -182,7 +184,7 @@ class ManageAdsPage extends StatelessWidget {
         elevation: 0,
         title: const Text(
           'Ads Management',
-          style: TextStyle(fontWeight: FontWeight.w800),
+          style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87),
         ),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(

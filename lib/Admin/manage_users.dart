@@ -15,13 +15,16 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
 
   Future<void> _openUserForm({User? user}) async {
     final isEditing = user != null;
-    final fullNameController =
-        TextEditingController(text: user?.fullName ?? '');
+    final fullNameController = TextEditingController(
+      text: user?.fullName ?? '',
+    );
     final emailController = TextEditingController(text: user?.email ?? '');
-    final registrationNoController =
-        TextEditingController(text: user?.registrationNo ?? '');
-    final passwordController =
-        TextEditingController(text: user?.password ?? '');
+    final registrationNoController = TextEditingController(
+      text: user?.registrationNo ?? '',
+    );
+    final passwordController = TextEditingController(
+      text: user?.password ?? '',
+    );
     var selectedRole = user?.role ?? 'student';
     var isSaving = false;
 
@@ -71,13 +74,13 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
               if (result['success']) {
                 if (context.mounted) Navigator.of(context).pop(true);
                 if (!mounted) return;
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(content: Text(result['message'])),
-                );
+                ScaffoldMessenger.of(
+                  this.context,
+                ).showSnackBar(SnackBar(content: Text(result['message'])));
               } else {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(content: Text(result['message'])),
-                );
+                ScaffoldMessenger.of(
+                  this.context,
+                ).showSnackBar(SnackBar(content: Text(result['message'])));
               }
             }
 
@@ -158,10 +161,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                           value: 'provider',
                           child: Text('Provider'),
                         ),
-                        DropdownMenuItem(
-                          value: 'admin',
-                          child: Text('Admin'),
-                        ),
+                        DropdownMenuItem(value: 'admin', child: Text('Admin')),
                       ],
                       onChanged: (value) {
                         if (value == null) return;
@@ -187,11 +187,14 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
-                            : Text(isEditing ? 'Save Changes' : 'Create Account'),
+                            : Text(
+                                isEditing ? 'Save Changes' : 'Create Account',
+                              ),
                       ),
                     ),
                   ],
@@ -205,7 +208,8 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
   }
 
   Future<void> _deleteUser(User user) async {
-    final shouldDelete = await showDialog<bool>(
+    final shouldDelete =
+        await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Delete Account'),
@@ -232,9 +236,9 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     final result = await _authService.deleteManagedUser(user.uid);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result['message'])),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result['message'])));
   }
 
   @override
@@ -247,7 +251,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         foregroundColor: Colors.black87,
         title: const Text(
           'User Management',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -267,10 +271,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                 child: Text(
                   'Failed to load users. Check Firestore rules or connection.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 15,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade700, fontSize: 15),
                 ),
               ),
             );
@@ -386,7 +387,10 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                             onPressed: user.uid == 'system_admin'
                                 ? null
                                 : () => _deleteUser(user),
-                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                            ),
                             label: const Text('Delete'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red.shade400,
@@ -464,13 +468,13 @@ class _RoleBadge extends StatelessWidget {
     final badgeColor = normalizedRole == 'admin'
         ? const Color(0xFFFFE7C2)
         : normalizedRole == 'provider'
-            ? const Color(0xFFDDF6E8)
-            : const Color(0xFFEDEBFF);
+        ? const Color(0xFFDDF6E8)
+        : const Color(0xFFEDEBFF);
     final textColor = normalizedRole == 'admin'
         ? const Color(0xFF9A5A00)
         : normalizedRole == 'provider'
-            ? const Color(0xFF167C45)
-            : const Color(0xFF4A3DE0);
+        ? const Color(0xFF167C45)
+        : const Color(0xFF4A3DE0);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

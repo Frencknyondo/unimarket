@@ -62,9 +62,9 @@ class _SendNotificationsPageState extends State<SendNotificationsPage> {
       if (!mounted) return;
       _titleController.clear();
       _messageController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification sent')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Notification sent')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,7 +86,7 @@ class _SendNotificationsPageState extends State<SendNotificationsPage> {
         elevation: 0,
         title: const Text(
           'Send Notification',
-          style: TextStyle(fontWeight: FontWeight.w700),
+          style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black87),
         ),
       ),
       body: StreamBuilder<List<User>>(
@@ -187,9 +187,7 @@ class _SendNotificationsPageState extends State<SendNotificationsPage> {
                       controller: _messageController,
                       minLines: 4,
                       maxLines: 6,
-                      decoration: const InputDecoration(
-                        hintText: 'Message',
-                      ),
+                      decoration: const InputDecoration(hintText: 'Message'),
                     ),
                   ],
                 ),
@@ -198,7 +196,9 @@ class _SendNotificationsPageState extends State<SendNotificationsPage> {
               SizedBox(
                 height: 54,
                 child: ElevatedButton.icon(
-                  onPressed: _isSending || snapshot.connectionState == ConnectionState.waiting
+                  onPressed:
+                      _isSending ||
+                          snapshot.connectionState == ConnectionState.waiting
                       ? null
                       : () => _send(users),
                   icon: _isSending
