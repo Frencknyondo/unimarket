@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'account_settings.dart';
 import 'home.dart';
@@ -12,6 +13,7 @@ import 'provider/ads.dart';
 import 'provider/my_listings.dart';
 import 'provider/my_sales.dart';
 import 'services/auth_service.dart';
+import 'services/push_notifications_service.dart';
 import 'signin.dart';
 import 'student/my_purchases.dart';
 
@@ -27,12 +29,80 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   late User _currentUser;
   bool _pushNotifications = false;
+  bool _isSavingPushSetting = false;
   late final Future<_ProfileStats> _statsFuture = _loadProfileStats();
 
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
+    _loadPushNotificationPreference();
+  }
+
+  Future<void> _loadPushNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('push_notifications_enabled') ?? false;
+    if (!mounted) return;
+    setState(() {
+      _pushNotifications = enabled;
+    });
+  }
+
+  Future<void> _savePushNotificationPreference(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('push_notifications_enabled', value);
+  }
+
+  Future<void> _updatePushNotificationSetting(bool enabled) async {
+    if (!mounted) return;
+    setState(() {
+      _isSavingPushSetting = true;
+    });
+
+    final messenger = ScaffoldMessenger.of(context);
+    final service = PushNotificationService();
+    if (enabled) {
+      final granted = await service.enableNotifications(_currentUser.uid);
+      if (!mounted) return;
+      if (granted) {
+        await _savePushNotificationPreference(true);
+        setState(() {
+          _pushNotifications = true;
+        });
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Push notifications enabled.')),
+        );
+      } else {
+        await _savePushNotificationPreference(false);
+        if (!mounted) return;
+        setState(() {
+          _pushNotifications = false;
+        });
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Notification permission denied. Please allow notifications from your device settings.',
+            ),
+          ),
+        );
+      }
+    } else {
+      await service.disableNotifications(_currentUser.uid);
+      await _savePushNotificationPreference(false);
+      if (!mounted) return;
+      setState(() {
+        _pushNotifications = false;
+      });
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Push notifications disabled.')),
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _isSavingPushSetting = false;
+      });
+    }
   }
 
   bool get _isProvider => _currentUser.role.trim().toLowerCase() == 'provider';
@@ -267,10 +337,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const SizedBox(
-                            height: 86,
-                            child: Center(child: CircularProgressIndicator()),
-                          );
+                          return const _StatsSkeleton();
                         }
                         if (snapshot.hasError || !snapshot.hasData) {
                           return const SizedBox(
@@ -326,18 +393,28 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     SwitchListTile(
                       value: _pushNotifications,
-                      onChanged: (value) {
-                        setState(() {
-                          _pushNotifications = value;
-                        });
-                      },
+                      onChanged: _isSavingPushSetting
+                          ? null
+                          : _updatePushNotificationSetting,
                       activeThumbColor: Colors.white,
                       activeTrackColor: const Color(0xFF2F65FF),
                       title: const Text(
                         'Push Notifications',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      secondary: const Icon(Icons.notifications_none_rounded),
+                      subtitle: Text(
+                        _pushNotifications
+                            ? 'Notifications are enabled'
+                            : 'Tap to allow product and chat alerts',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      secondary: _isSavingPushSetting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.notifications_none_rounded),
                     ),
                     const Divider(height: 1),
                     _PrivacySecurityTile(),
@@ -401,9 +478,9 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
     if (title == 'Ads') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => AdsPage(user: _currentUser)),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => AdsPage(user: _currentUser)));
       return;
     }
     if (title == 'My Sales') {
@@ -519,6 +596,59 @@ class _StatsPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(children: cells),
+    );
+  }
+}
+
+class _StatsSkeleton extends StatelessWidget {
+  const _StatsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget skeletonCell() {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 20,
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E9EE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            Container(
+              height: 14,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE7E9EE),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      height: 86,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F7F7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          skeletonCell(),
+          const SizedBox(width: 10),
+          skeletonCell(),
+          const SizedBox(width: 10),
+          skeletonCell(),
+          const SizedBox(width: 10),
+          skeletonCell(),
+        ],
+      ),
     );
   }
 }

@@ -160,7 +160,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                   );
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const _OrdersLoadingSkeleton();
                 }
 
                 final docs = snapshot.data?.docs ?? const [];
@@ -391,9 +391,7 @@ class _OrdersListBaseState extends State<OrdersListPage> {
                                 ),
                                 child: const Text(
                                   'more..',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                  style: TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
                               if (!widget.buyerView) ...[
@@ -561,6 +559,95 @@ class _OrdersListBaseState extends State<OrdersListPage> {
         backgroundColor: Colors.white,
         selectedColor: const Color(0xFFEAF4FF),
       ),
+    );
+  }
+}
+
+class _OrdersLoadingSkeleton extends StatelessWidget {
+  const _OrdersLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      itemCount: 4,
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x110F172A),
+                blurRadius: 12,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 18,
+                width: MediaQuery.of(context).size.width * 0.45,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7E9EE),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE7E9EE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 12,
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE7E9EE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        Container(
+                          height: 12,
+                          width: MediaQuery.of(context).size.width * 0.25,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE7E9EE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 12,
+                width: MediaQuery.of(context).size.width * 0.35,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE7E9EE),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

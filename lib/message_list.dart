@@ -8,6 +8,30 @@ import 'layout/provider_bottom_nav.dart';
 import 'layout/student_bottom_nav.dart';
 import 'models/user_model.dart';
 
+Widget _buildUserAvatar(User user, {double radius = 24}) {
+  final picture = user.profilePicture?.trim();
+  if (picture?.isNotEmpty == true) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFFDCE6FF),
+      backgroundImage: NetworkImage(picture!),
+      onBackgroundImageError: (error, stackTrace) {},
+    );
+  }
+
+  final seed = Uri.encodeComponent(
+    user.fullName.trim().isEmpty ? user.uid : user.fullName,
+  );
+
+  return CircleAvatar(
+    radius: radius,
+    backgroundColor: const Color(0xFFDCE6FF),
+    backgroundImage: NetworkImage(
+      'https://api.dicebear.com/7.x/adventurer-neutral/png?seed=$seed',
+    ),
+  );
+}
+
 class MessageListPage extends StatefulWidget {
   final User currentUser;
   final User? initialPeer;
@@ -126,7 +150,7 @@ class _MessageListPageState extends State<MessageListPage>
           }
 
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const _ChatThreadListSkeleton();
           }
 
           final allThreads = snapshot.data ?? const <_ChatThread>[];
@@ -344,13 +368,7 @@ class _ChatConversationPageState extends State<ChatConversationPage>
               children: [
                 Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: const Color(0xFFE0E8FF),
-                      backgroundImage: NetworkImage(
-                        'https://api.dicebear.com/7.x/adventurer-neutral/png?seed=${Uri.encodeComponent(peer.fullName)}',
-                      ),
-                    ),
+                    _buildUserAvatar(peer, radius: 22),
                     Positioned(
                       right: 1,
                       bottom: 1,
@@ -422,7 +440,7 @@ class _ChatConversationPageState extends State<ChatConversationPage>
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const _ChatConversationSkeleton();
                 }
 
                 final messages = snapshot.data ?? const <_ChatMessage>[];
@@ -668,13 +686,7 @@ class _ConversationTile extends StatelessWidget {
             children: [
               Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: const Color(0xFFDCE6FF),
-                    backgroundImage: NetworkImage(
-                      'https://api.dicebear.com/7.x/adventurer-neutral/png?seed=${Uri.encodeComponent(peerUser.fullName)}',
-                    ),
-                  ),
+                  _buildUserAvatar(peerUser, radius: 24),
                   Positioned(
                     right: 2,
                     bottom: 2,
@@ -708,7 +720,7 @@ class _ConversationTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Color(0xFF1F285C),
-                            fontSize: 10,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
@@ -851,6 +863,122 @@ class _MessageStateCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ChatThreadListSkeleton extends StatelessWidget {
+  const _ChatThreadListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+      itemCount: 4,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x110F172A),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE7E9EE),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 12,
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7E9EE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    Container(
+                      height: 12,
+                      width: MediaQuery.of(context).size.width * 0.4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7E9EE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ChatConversationSkeleton extends StatelessWidget {
+  const _ChatConversationSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 5,
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final isMine = index.isEven;
+        return Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.6,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isMine ? const Color(0xFFE7EEFF) : Colors.white,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 12,
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7E9EE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                Container(
+                  height: 12,
+                  width: MediaQuery.of(context).size.width * 0.3,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7E9EE),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

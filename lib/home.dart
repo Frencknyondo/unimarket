@@ -578,8 +578,39 @@ class _NotificationsSheet extends StatelessWidget {
   }
 }
 
-class _HomeAdsBanner extends StatelessWidget {
+class _HomeAdsBanner extends StatefulWidget {
   const _HomeAdsBanner();
+
+  @override
+  State<_HomeAdsBanner> createState() => _HomeAdsBannerState();
+}
+
+class _HomeAdsBannerState extends State<_HomeAdsBanner> {
+  int _activeAdIndex = 0;
+  int _adCount = 0;
+  Timer? _rotationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRotationTimer();
+  }
+
+  @override
+  void dispose() {
+    _rotationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startRotationTimer() {
+    _rotationTimer?.cancel();
+    _rotationTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || _adCount < 2) return;
+      setState(() {
+        _activeAdIndex = (_activeAdIndex + 1) % _adCount;
+      });
+    });
+  }
 
   Future<void> _openWhatsApp(BuildContext context, AdModel ad) async {
     final phone = ad.phone.replaceAll(RegExp(r'[^0-9+]'), '');
@@ -599,24 +630,32 @@ class _HomeAdsBanner extends StatelessWidget {
           .where('status', isEqualTo: 'approved')
           .snapshots(),
       builder: (context, snapshot) {
-        final ads = (snapshot.data?.docs ?? const [])
-            .map((doc) => AdModel.fromFirestore(doc))
-            .where((ad) => ad.isActive)
-            .toList()
-          ..sort((a, b) {
-            final aDate = a.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            final bDate = b.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-            return bDate.compareTo(aDate);
-          });
+        final ads =
+            (snapshot.data?.docs ?? const [])
+                .map((doc) => AdModel.fromFirestore(doc))
+                .where((ad) => ad.isActive)
+                .toList()
+              ..sort((a, b) {
+                final aDate =
+                    a.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                final bDate =
+                    b.approvedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                return bDate.compareTo(aDate);
+              });
+
+        _adCount = ads.length;
+        if (_activeAdIndex >= _adCount) {
+          _activeAdIndex = 0;
+        }
 
         if (ads.isEmpty) return const SizedBox.shrink();
-        final ad = ads.first;
+        final ad = ads[_activeAdIndex];
 
         return GestureDetector(
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => AdDetailsPage(ad: ad)),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => AdDetailsPage(ad: ad)));
           },
           child: Container(
             height: 164,

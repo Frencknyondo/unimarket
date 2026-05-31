@@ -23,11 +23,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   User? _currentUser;
   bool _isUserLoading = true;
   bool _isFetchingNotifications = false;
+  bool _isLoadingAdminSummary = true;
+  _AdminNotificationSummary _adminSummary = _AdminNotificationSummary.empty();
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+    _loadAdminSummary();
   }
 
   Future<void> _loadCurrentUser() async {
@@ -42,6 +45,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> _showAdminNotifications() async {
     final summary = await _fetchAdminNotifications();
     if (!mounted) return;
+
+    setState(() {
+      _adminSummary = summary;
+      _isLoadingAdminSummary = false;
+    });
 
     showDialog<void>(
       context: context,
@@ -60,6 +68,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _buildNotificationRow(
                   summary.newListingCount,
                   'New marketplace listings',
+                ),
+                const SizedBox(height: 8),
+                _buildNotificationRow(
+                  summary.newAdsCount,
+                  'New banner ads submitted',
                 ),
                 const SizedBox(height: 8),
                 _buildNotificationRow(
@@ -85,6 +98,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   ),
                   const SizedBox(height: 8),
                   ...summary.recentListingTitles.map(
+                    (title) =>
+                        Text('- $title', style: const TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (summary.recentAdNames.isNotEmpty) ...[
+                  const Text(
+                    'Recent ads',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  ...summary.recentAdNames.map(
                     (title) =>
                         Text('- $title', style: const TextStyle(fontSize: 13)),
                   ),
@@ -165,6 +190,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       final ordersSnapshot = await FirebaseFirestore.instance
           .collection('orders')
           .get();
+      final adsSnapshot = await FirebaseFirestore.instance
+          .collection('ads')
+          .get();
 
       final recentUsers = usersSnapshot.docs
           .where((doc) => _isRecent(doc.data()['createdAt'], since))
@@ -191,22 +219,47 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           .map((doc) => (id: doc.id))
           .toList();
 
+      final recentAds = adsSnapshot.docs
+          .where((doc) => _isRecent(doc.data()['createdAt'], since))
+          .map(
+            (doc) => (
+              title:
+                  (doc.data()['businessName'] as String?)?.trim() ??
+                  (doc.data()['title'] as String?)?.trim() ??
+                  'Untitled ad',
+            ),
+          )
+          .toList();
+
       return _AdminNotificationSummary(
         newUserCount: recentUsers.length,
         newListingCount: recentListings.length,
         newOrdersCount: recentOrders.length,
+        newAdsCount: recentAds.length,
         recentUserNames: recentUsers.map((item) => item.name).take(5).toList(),
         recentListingTitles: recentListings
             .map((item) => item.title)
             .take(5)
             .toList(),
         recentOrderIds: recentOrders.map((item) => item.id).take(5).toList(),
+        recentAdNames: recentAds.map((item) => item.title).take(5).toList(),
       );
     } finally {
       if (mounted) {
         setState(() => _isFetchingNotifications = false);
       }
     }
+  }
+
+  Future<void> _loadAdminSummary() async {
+    if (!mounted) return;
+    setState(() => _isLoadingAdminSummary = true);
+    final summary = await _fetchAdminNotifications();
+    if (!mounted) return;
+    setState(() {
+      _adminSummary = summary;
+      _isLoadingAdminSummary = false;
+    });
   }
 
   bool _isRecent(dynamic createdAt, DateTime since) {
@@ -261,9 +314,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             },
           ),
           IconButton(
-            icon: const Icon(
-              Icons.notifications_rounded,
-              color: Colors.black54,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_rounded, color: Colors.black54),
+                if (!_isLoadingAdminSummary &&
+                    _adminSummary.totalNewUpdates > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _adminSummary.totalNewUpdates > 9
+                            ? '9+'
+                            : '${_adminSummary.totalNewUpdates}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             onPressed: _isFetchingNotifications
                 ? null
@@ -381,6 +462,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.groups_rounded,
                     label: 'Users',
+                    badgeCount: _adminSummary.newUserCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -393,6 +475,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.notifications_active_rounded,
                     label: 'Notifications',
+                    badgeCount: _adminSummary.totalNewUpdates,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -405,6 +488,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.campaign_rounded,
                     label: 'Ads',
+                    badgeCount: _adminSummary.newAdsCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -417,6 +501,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.storefront_rounded,
                     label: 'Marketplace',
+                    badgeCount: _adminSummary.newListingCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -530,6 +615,46 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    if (_isLoadingAdminSummary)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else ...[
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _AdminStatCard(
+                            label: 'Users',
+                            value: _adminSummary.newUserCount,
+                            description: 'New signups',
+                            color: const Color(0xFF4A3DE0),
+                          ),
+                          _AdminStatCard(
+                            label: 'Listings',
+                            value: _adminSummary.newListingCount,
+                            description: 'New marketplace items',
+                            color: const Color(0xFF2F65FF),
+                          ),
+                          _AdminStatCard(
+                            label: 'Orders',
+                            value: _adminSummary.newOrdersCount,
+                            description: 'Recent orders',
+                            color: const Color(0xFF16A34A),
+                          ),
+                          _AdminStatCard(
+                            label: 'Ads',
+                            value: _adminSummary.newAdsCount,
+                            description: 'New banners',
+                            color: const Color(0xFFEF4444),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _AdminTile(
                       title: 'Users Management',
                       subtitle: 'Review students, admins, and providers.',
@@ -595,27 +720,50 @@ class _AdminNotificationSummary {
   final int newUserCount;
   final int newListingCount;
   final int newOrdersCount;
+  final int newAdsCount;
   final List<String> recentUserNames;
   final List<String> recentListingTitles;
   final List<String> recentOrderIds;
+  final List<String> recentAdNames;
+
+  int get totalNewUpdates {
+    return newUserCount + newListingCount + newOrdersCount + newAdsCount;
+  }
 
   bool get isEmpty {
     return newUserCount == 0 &&
         newListingCount == 0 &&
         newOrdersCount == 0 &&
+        newAdsCount == 0 &&
         recentUserNames.isEmpty &&
         recentListingTitles.isEmpty &&
-        recentOrderIds.isEmpty;
+        recentOrderIds.isEmpty &&
+        recentAdNames.isEmpty;
   }
 
-  _AdminNotificationSummary({
+  const _AdminNotificationSummary({
     required this.newUserCount,
     required this.newListingCount,
     required this.newOrdersCount,
+    required this.newAdsCount,
     required this.recentUserNames,
     required this.recentListingTitles,
     required this.recentOrderIds,
+    required this.recentAdNames,
   });
+
+  factory _AdminNotificationSummary.empty() {
+    return const _AdminNotificationSummary(
+      newUserCount: 0,
+      newListingCount: 0,
+      newOrdersCount: 0,
+      newAdsCount: 0,
+      recentUserNames: <String>[],
+      recentListingTitles: <String>[],
+      recentOrderIds: <String>[],
+      recentAdNames: <String>[],
+    );
+  }
 }
 
 class _AdminTile extends StatelessWidget {
@@ -715,16 +863,78 @@ class _AdminTile extends StatelessWidget {
   }
 }
 
+class _AdminStatCard extends StatelessWidget {
+  final String label;
+  final int value;
+  final String description;
+  final Color color;
+
+  const _AdminStatCard({
+    required this.label,
+    required this.value,
+    required this.description,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 170,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 12,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$value',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w900,
+              fontSize: 32,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SidebarItem extends StatelessWidget {
   final bool collapsed;
   final IconData icon;
   final String label;
+  final int badgeCount;
   final VoidCallback? onTap;
 
   const _SidebarItem({
     required this.collapsed,
     required this.icon,
     required this.label,
+    this.badgeCount = 0,
     this.onTap,
   });
 
@@ -744,14 +954,50 @@ class _SidebarItem extends StatelessWidget {
               final showLabel = constraints.maxWidth >= 120;
               if (!showLabel) {
                 return Center(
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEDEBFF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: const Color(0xFF4A3DE0), size: 22),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEDEBFF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: const Color(0xFF4A3DE0),
+                          size: 22,
+                        ),
+                      ),
+                      if (badgeCount > 0)
+                        Positioned(
+                          top: -4,
+                          right: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.8,
+                              ),
+                            ),
+                            child: Text(
+                              badgeCount > 9 ? '9+' : '$badgeCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 );
               }
@@ -775,6 +1021,26 @@ class _SidebarItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (badgeCount > 0)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        badgeCount > 9 ? '9+' : '$badgeCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                 ],
               );
             },

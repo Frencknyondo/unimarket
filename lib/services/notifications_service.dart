@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'fcm_push_service.dart';
+
 class AppNotification {
   final String id;
   final String userId;
@@ -42,9 +44,11 @@ class AppNotification {
 
 class NotificationsService {
   NotificationsService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance,
+      _fcmPushService = FCMPushService();
 
   final FirebaseFirestore _firestore;
+  final FCMPushService _fcmPushService;
   static const _notificationsCollection = 'notifications';
 
   Stream<List<AppNotification>> notificationsStream(String userId) {
@@ -68,9 +72,9 @@ class NotificationsService {
   }
 
   Stream<int> unreadCountStream(String userId) {
-    return notificationsStream(userId).map(
-      (items) => items.where((item) => !item.isRead).length,
-    );
+    return notificationsStream(
+      userId,
+    ).map((items) => items.where((item) => !item.isRead).length);
   }
 
   Future<void> createNotification({
@@ -91,6 +95,17 @@ class NotificationsService {
       'isRead': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    // Send push notification asynchronously (don't wait for it)
+    _fcmPushService.sendPushToUser(
+      userId: userId,
+      title: title,
+      message: message,
+      data: {
+        'type': type.trim().isEmpty ? 'general' : type.trim(),
+        'orderId': orderId.trim(),
+      },
+    );
   }
 
   Future<void> createNotificationsForUsers({
@@ -121,18 +136,29 @@ class NotificationsService {
       });
     }
     await batch.commit();
+
+    // Send push notifications asynchronously
+    await _fcmPushService.sendPushToUsers(
+      userIds: cleanUserIds,
+      title: title,
+      message: message,
+      data: {
+        'type': type.trim().isEmpty ? 'general' : type.trim(),
+        'orderId': orderId.trim(),
+      },
+    );
   }
 
   Future<void> markAsRead(String notificationId) async {
     if (notificationId.trim().isEmpty) return;
 
-    await _firestore.collection(_notificationsCollection).doc(notificationId).set(
-      {
-        'isRead': true,
-        'readAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    await _firestore
+        .collection(_notificationsCollection)
+        .doc(notificationId)
+        .set({
+          'isRead': true,
+          'readAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
   }
 
   Future<void> markAllAsRead(String userId) async {
