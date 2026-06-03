@@ -28,6 +28,7 @@ class _HomePageState extends State<HomePage> {
   final NotificationsService _notificationsService = NotificationsService();
   bool _showAllCategories = false;
   String _selectedCategory = 'All';
+  String _sortBy = 'All';
 
   final List<_CategoryItem> _categories = const [
     _CategoryItem(label: 'Clothing', icon: Icons.checkroom_rounded),
@@ -40,12 +41,6 @@ class _HomePageState extends State<HomePage> {
 
   List<_CategoryItem> get _visibleCategories =>
       _showAllCategories ? _categories : _categories.take(4).toList();
-
-  String _normalizeCategory(String value) {
-    final normalized = value.trim().toLowerCase();
-    if (normalized == 'stationery') return 'stationary';
-    return normalized;
-  }
 
   final Set<String> _sellerNameBackfills = {};
 
@@ -132,7 +127,10 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         const Text(
                           'Welcome back,',
-                          style: TextStyle(fontSize: 8, color: Colors.black54),
+                          style: TextStyle(
+                            fontSize: 8,
+                            color: Color(0xFF111827),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -273,40 +271,40 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     _FilterChip(
                       label: 'All',
-                      isActive: _selectedCategory == 'All',
+                      isActive: _sortBy == 'All',
                       onTap: () {
                         setState(() {
-                          _selectedCategory = 'All';
+                          _sortBy = 'All';
                         });
                       },
                     ),
                     const SizedBox(width: 10),
                     _FilterChip(
-                      label: 'Clothing',
-                      isActive: _selectedCategory == 'Clothing',
+                      label: 'Most Popular',
+                      isActive: _sortBy == 'Most Popular',
                       onTap: () {
                         setState(() {
-                          _selectedCategory = 'Clothing';
+                          _sortBy = 'Most Popular';
                         });
                       },
                     ),
                     const SizedBox(width: 10),
                     _FilterChip(
-                      label: 'Food',
-                      isActive: _selectedCategory == 'Food',
+                      label: 'Newest First',
+                      isActive: _sortBy == 'Newest First',
                       onTap: () {
                         setState(() {
-                          _selectedCategory = 'Food';
+                          _sortBy = 'Newest First';
                         });
                       },
                     ),
                     const SizedBox(width: 10),
                     _FilterChip(
-                      label: 'Stationary',
-                      isActive: _selectedCategory == 'Stationary',
+                      label: 'Low Price',
+                      isActive: _sortBy == 'Low Price',
                       onTap: () {
                         setState(() {
-                          _selectedCategory = 'Stationary';
+                          _sortBy = 'Low Price';
                         });
                       },
                     ),
@@ -390,21 +388,55 @@ class _HomePageState extends State<HomePage> {
                         );
                       }
 
-                      final filteredListings = listings.where((item) {
-                        if (_selectedCategory == 'All') return true;
-                        return _normalizeCategory(item.category) ==
-                            _normalizeCategory(_selectedCategory);
-                      }).toList();
+                      // Apply sorting based on _sortBy selection
+                      final sortedListings = List<ProductListing>.from(
+                        listings,
+                      );
+                      switch (_sortBy) {
+                        case 'Newest First':
+                          sortedListings.sort((a, b) {
+                            final aDate =
+                                a.createdAt ??
+                                DateTime.fromMillisecondsSinceEpoch(0);
+                            final bDate =
+                                b.createdAt ??
+                                DateTime.fromMillisecondsSinceEpoch(0);
+                            return bDate.compareTo(aDate);
+                          });
+                          break;
+                        case 'Low Price':
+                          sortedListings.sort(
+                            (a, b) => a.price.compareTo(b.price),
+                          );
+                          break;
+                        case 'Most Popular':
+                          // Sort by favorites count (will need to fetch favorites data)
+                          // For now, default to newest first as a fallback
+                          sortedListings.sort((a, b) {
+                            final aDate =
+                                a.createdAt ??
+                                DateTime.fromMillisecondsSinceEpoch(0);
+                            final bDate =
+                                b.createdAt ??
+                                DateTime.fromMillisecondsSinceEpoch(0);
+                            return bDate.compareTo(aDate);
+                          });
+                          break;
+                        case 'All':
+                        default:
+                          // Keep original order (newest first from Firestore)
+                          break;
+                      }
 
-                      if (filteredListings.isEmpty) {
-                        final message = _selectedCategory == 'All'
-                            ? 'No listings found yet. Products will appear here soon.'
-                            : '$_selectedCategory listings are coming soon.';
-                        return _ProductsStateCard(message: message);
+                      if (sortedListings.isEmpty) {
+                        return _ProductsStateCard(
+                          message:
+                              'No listings found yet. Products will appear here soon.',
+                        );
                       }
 
                       return _MasonryProductGrid(
-                        listings: filteredListings,
+                        listings: sortedListings,
                         currentUser: widget.user,
                       );
                     },

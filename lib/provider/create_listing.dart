@@ -67,6 +67,46 @@ class _CreateListingPageState extends State<CreateListingPage> {
     return Uri.tryParse(url)?.hasAbsolutePath ?? false;
   }
 
+  List<String> _buildSearchKeywords({
+    required String title,
+    required String category,
+    required String location,
+    required String specificLocation,
+  }) {
+    final normalized = <String>{};
+    final titleLower = title.toLowerCase().trim();
+
+    String normalizeText(String value) => value.toLowerCase().trim();
+
+    List<String> tokenize(String value) {
+      return normalizeText(
+        value,
+      ).split(RegExp(r'[\s,.-]+')).where((token) => token.isNotEmpty).toList();
+    }
+
+    void addWordAndPrefixes(String value) {
+      final tokens = tokenize(value);
+      for (final token in tokens) {
+        normalized.add(token);
+        for (var length = 2; length <= token.length; length++) {
+          normalized.add(token.substring(0, length));
+        }
+      }
+    }
+
+    normalized.add(titleLower);
+    normalized.add(normalizeText(category));
+    normalized.add(normalizeText(location));
+    normalized.add(normalizeText(specificLocation));
+
+    addWordAndPrefixes(title);
+    addWordAndPrefixes(category);
+    addWordAndPrefixes(location);
+    addWordAndPrefixes(specificLocation);
+
+    return normalized.toList();
+  }
+
   InputDecoration _inputDecoration(String hintText, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hintText,
@@ -313,6 +353,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
 
       await FirebaseFirestore.instance.collection('listings').add({
         'title': _titleController.text.trim(),
+        'title_lower': _titleController.text.trim().toLowerCase(),
         'description': _descriptionController.text.trim(),
         'price': price,
         'currency': 'Tsh',
@@ -325,6 +366,12 @@ class _CreateListingPageState extends State<CreateListingPage> {
         'sellerName': sellerName,
         'sellerEmail': widget.user.email.trim(),
         'userId': widget.user.uid,
+        'keywords': _buildSearchKeywords(
+          title: _titleController.text.trim(),
+          category: _selectedCategory!,
+          location: _selectedLocation,
+          specificLocation: _specificLocationController.text.trim(),
+        ),
         'createdAt': Timestamp.now(),
       });
 

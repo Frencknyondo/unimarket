@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'models/user_model.dart';
+import 'models/product_listing.dart';
+import 'services/search_service.dart';
+import 'student/listing_details.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  final User? currentUser;
+
+  const SearchPage({super.key, this.currentUser});
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -9,10 +15,12 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
+  SearchResult? _searchResult;
+  bool _isLoading = false;
+  String _lastSearchQuery = '';
 
   String _selectedCategory = 'All';
-  String _selectedPriceRange = 'Any Price';
-  String _selectedCondition = 'Any Condition';
+  String _selectedPriceRange = 'All Price';
   String _selectedSortBy = 'Newest First';
 
   static const List<String> _categories = [
@@ -29,18 +37,10 @@ class _SearchPageState extends State<SearchPage> {
   ];
 
   static const List<String> _priceRangeOptions = [
-    'Any Price',
-    'Under GH₵10',
-    'GH₵10 - GH₵50',
-    'Above GH₵50',
-  ];
-
-  static const List<String> _conditionOptions = [
-    'Any Condition',
-    'Brand New',
-    'Like New',
-    'Good',
-    'Fair',
+    'All Price',
+    'Under 10,000 TSH',
+    '11,000 - 30,000 TSH',
+    'Over 30,000 TSH',
   ];
 
   static const List<String> _sortOptions = [
@@ -50,10 +50,41 @@ class _SearchPageState extends State<SearchPage> {
     'Most Popular',
   ];
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResult = null;
+        _lastSearchQuery = '';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _lastSearchQuery = query;
+    });
+
+    try {
+      final result = await SearchService.performSearch(query);
+      if (mounted) {
+        setState(() {
+          _searchResult = result;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Search error: $e')));
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _onSuggestionTap(String suggestion) {
+    _searchController.text = suggestion;
+    _performSearch(suggestion);
   }
 
   void _openFilters() {
@@ -76,36 +107,23 @@ class _SearchPageState extends State<SearchPage> {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            child: _BuildFilterSheet(
+            child: _FilterSheet(
               selectedCategory: _selectedCategory,
               selectedPriceRange: _selectedPriceRange,
-              selectedCondition: _selectedCondition,
               selectedSortBy: _selectedSortBy,
               onCategorySelected: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                });
+                setState(() => _selectedCategory = value);
               },
               onPriceRangeSelected: (value) {
-                setState(() {
-                  _selectedPriceRange = value;
-                });
-              },
-              onConditionSelected: (value) {
-                setState(() {
-                  _selectedCondition = value;
-                });
+                setState(() => _selectedPriceRange = value);
               },
               onSortBySelected: (value) {
-                setState(() {
-                  _selectedSortBy = value;
-                });
+                setState(() => _selectedSortBy = value);
               },
               onClearAll: () {
                 setState(() {
                   _selectedCategory = 'All';
-                  _selectedPriceRange = 'Any Price';
-                  _selectedCondition = 'Any Condition';
+                  _selectedPriceRange = 'All Price';
                   _selectedSortBy = 'Newest First';
                 });
               },
@@ -116,18 +134,51 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
+  void _showAlgorithmInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Search Algorithm'),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Fuzzy Matching with Levenshtein Distance',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'How it works:\n\n'
+                '1. Exact Match: First searches for exact keyword matches in product titles, descriptions, and categories.\n\n'
+                '2. Fuzzy Suggestions: Uses Levenshtein distance algorithm to find similar words even with typos.\n\n'
+                '3. Similarity Score: Calculates how similar each suggestion is (0-100%), minimum 60% to show.\n\n'
+                '4. "Did you mean?": Shows top 5 suggestions if exact search has few results.\n\n'
+                'Example: Searching "kndl" suggests "kindle" with high similarity score.',
+                style: TextStyle(fontSize: 13, height: 1.6),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selectedFilters = <String>[];
-    if (_selectedCategory != 'All') selectedFilters.add(_selectedCategory);
-    if (_selectedPriceRange != 'Any Price') {
-      selectedFilters.add(_selectedPriceRange);
-    }
-    if (_selectedCondition != 'Any Condition') {
-      selectedFilters.add(_selectedCondition);
-    }
-    if (_selectedSortBy != 'Newest First') selectedFilters.add(_selectedSortBy);
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -138,13 +189,19 @@ class _SearchPageState extends State<SearchPage> {
           'Search',
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline_rounded),
+            onPressed: _showAlgorithmInfo,
+            tooltip: 'Search Algorithm Info',
+          ),
+        ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Row(
               children: [
                 Expanded(
                   child: Container(
@@ -164,8 +221,9 @@ class _SearchPageState extends State<SearchPage> {
                           child: TextField(
                             controller: _searchController,
                             textInputAction: TextInputAction.search,
+                            onSubmitted: _performSearch,
                             decoration: const InputDecoration(
-                              hintText: 'Search for textbooks, electronics...',
+                              hintText: 'Search textbooks, electronics...',
                               border: InputBorder.none,
                             ),
                           ),
@@ -178,90 +236,404 @@ class _SearchPageState extends State<SearchPage> {
                 SizedBox(
                   height: 56,
                   width: 56,
-                  child: ElevatedButton(
+                  child: OutlinedButton(
                     onPressed: _openFilters,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A3DE0),
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF4A3DE0)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
                       ),
                       padding: EdgeInsets.zero,
                     ),
-                    child: const Icon(Icons.filter_list_rounded, size: 26),
+                    child: const Icon(
+                      Icons.filter_list_rounded,
+                      size: 26,
+                      color: Color(0xFF4A3DE0),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Filter preview',
-              style: TextStyle(
+          ),
+
+          // Suggestions section (Google-style "Did you mean?")
+          if (_searchResult != null && _searchResult!.hasSuggestions)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFFF0F4FF),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.lightbulb_outline_rounded,
+                        size: 18,
+                        color: Color(0xFF2563EB),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Did you mean?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _searchResult!.suggestions
+                        .map(
+                          (suggestion) => GestureDetector(
+                            onTap: () => _onSuggestionTap(suggestion),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF2563EB),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                suggestion,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF2563EB),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+
+          Expanded(child: _buildContent()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_lastSearchQuery.isEmpty) {
+      return _EmptySearchState();
+    }
+
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchResult == null || _searchResult!.products.isEmpty) {
+      return _NoResultsState(
+        query: _lastSearchQuery,
+        suggestions: _searchResult?.suggestions ?? [],
+        onSuggestionTap: _onSuggestionTap,
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Results for "$_lastSearchQuery" (${_searchResult!.products.length} found)',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6A5AE0),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _MasonryProductGrid(
+            listings: _searchResult!.products,
+            currentUser: widget.currentUser,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptySearchState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.search_off_rounded, size: 80, color: Color(0xFFE5E7EB)),
+          SizedBox(height: 16),
+          Text(
+            'Search for products',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Enter a product name to get started',
+            style: TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NoResultsState extends StatelessWidget {
+  final String query;
+  final List<String> suggestions;
+  final Function(String) onSuggestionTap;
+
+  const _NoResultsState({
+    required this.query,
+    required this.suggestions,
+    required this.onSuggestionTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.sentiment_dissatisfied_rounded,
+              size: 80,
+              color: Color(0xFFE5E7EB),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results for "$query"',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: Colors.black87,
               ),
             ),
-            const SizedBox(height: 10),
-            if (selectedFilters.isEmpty)
-              const Text(
-                'No filters applied yet. Tap the filter button to set options.',
-                style: TextStyle(color: Colors.black54, fontSize: 15),
-              )
-            else
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: selectedFilters
-                    .map(
-                      (value) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEAE8FF),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          value,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF4A3DE0),
-                          ),
+            const SizedBox(height: 8),
+            const Text(
+              'Try a different search or check the suggestions below',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+            if (suggestions.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Suggestions:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...suggestions.map(
+                    (suggestion) => GestureDetector(
+                      onTap: () => onSuggestionTap(suggestion),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: Color(0xFF6A5AE0),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                suggestion,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ),
+                ],
               ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(
-                      Icons.search_off_rounded,
-                      size: 90,
-                      color: Color(0xFFE5E7EB),
-                    ),
-                    SizedBox(height: 18),
-                    Text(
-                      'Search for items or apply filters',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Use the search bar and filter icon to narrow down listings.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 15, color: Colors.black54),
-                    ),
-                  ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MasonryProductGrid extends StatelessWidget {
+  final List<ProductListing> listings;
+  final User? currentUser;
+
+  const _MasonryProductGrid({
+    required this.listings,
+    required this.currentUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final leftItems = <ProductListing>[];
+    final rightItems = <ProductListing>[];
+
+    for (var index = 0; index < listings.length; index++) {
+      if (index.isEven) {
+        leftItems.add(listings[index]);
+      } else {
+        rightItems.add(listings[index]);
+      }
+    }
+
+    Widget column(List<ProductListing> items) {
+      return Column(
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            _SearchProductCard(product: items[index], currentUser: currentUser),
+            if (index != items.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: column(leftItems)),
+        const SizedBox(width: 10),
+        Expanded(child: column(rightItems)),
+      ],
+    );
+  }
+}
+
+class _SearchProductCard extends StatelessWidget {
+  final ProductListing product;
+  final User? currentUser;
+
+  const _SearchProductCard({required this.product, required this.currentUser});
+
+  String _formatPrice(double value) {
+    final whole = value.round();
+    return 'Tsh $whole';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: currentUser != null
+          ? () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ListingDetailsPage(
+                    product: product,
+                    currentUser: currentUser!,
+                  ),
                 ),
+              );
+            }
+          : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F6F8),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: product.images.isEmpty
+                    ? Container(
+                        color: const Color(0xFFE6E6E6),
+                        child: const Icon(
+                          Icons.image_not_supported_outlined,
+                          color: Color(0xFF9A9A9A),
+                        ),
+                      )
+                    : Image.network(
+                        product.images.first,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: const Color(0xFFE6E6E6),
+                            child: const Icon(
+                              Icons.broken_image_rounded,
+                              color: Color(0xFF9A9A9A),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatPrice(product.price),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1E88E5),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    product.sellerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF8A8A8A),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -271,25 +643,21 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
-class _BuildFilterSheet extends StatelessWidget {
+class _FilterSheet extends StatelessWidget {
   final String selectedCategory;
   final String selectedPriceRange;
-  final String selectedCondition;
   final String selectedSortBy;
   final ValueChanged<String> onCategorySelected;
   final ValueChanged<String> onPriceRangeSelected;
-  final ValueChanged<String> onConditionSelected;
   final ValueChanged<String> onSortBySelected;
   final VoidCallback onClearAll;
 
-  const _BuildFilterSheet({
+  const _FilterSheet({
     required this.selectedCategory,
     required this.selectedPriceRange,
-    required this.selectedCondition,
     required this.selectedSortBy,
     required this.onCategorySelected,
     required this.onPriceRangeSelected,
-    required this.onConditionSelected,
     required this.onSortBySelected,
     required this.onClearAll,
   });
@@ -346,7 +714,7 @@ class _BuildFilterSheet extends StatelessWidget {
           runSpacing: 10,
           children: _SearchPageState._categories.map((label) {
             final isActive = label == selectedCategory;
-            return _FilterOptionChip(
+            return _FilterChip(
               label: label,
               isActive: isActive,
               onTap: () => onCategorySelected(label),
@@ -364,28 +732,10 @@ class _BuildFilterSheet extends StatelessWidget {
           runSpacing: 10,
           children: _SearchPageState._priceRangeOptions.map((label) {
             final isActive = label == selectedPriceRange;
-            return _FilterOptionChip(
+            return _FilterChip(
               label: label,
               isActive: isActive,
               onTap: () => onPriceRangeSelected(label),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Condition',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: _SearchPageState._conditionOptions.map((label) {
-            final isActive = label == selectedCondition;
-            return _FilterOptionChip(
-              label: label,
-              isActive: isActive,
-              onTap: () => onConditionSelected(label),
             );
           }).toList(),
         ),
@@ -400,7 +750,7 @@ class _BuildFilterSheet extends StatelessWidget {
           runSpacing: 10,
           children: _SearchPageState._sortOptions.map((label) {
             final isActive = label == selectedSortBy;
-            return _FilterOptionChip(
+            return _FilterChip(
               label: label,
               isActive: isActive,
               onTap: () => onSortBySelected(label),
@@ -422,7 +772,7 @@ class _BuildFilterSheet extends StatelessWidget {
                 child: const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'Browse with Filters',
+                    'Cancel',
                     style: TextStyle(
                       color: Color(0xFF4A3DE0),
                       fontWeight: FontWeight.w700,
@@ -445,7 +795,10 @@ class _BuildFilterSheet extends StatelessWidget {
                   padding: EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'Apply Filters',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -457,12 +810,12 @@ class _BuildFilterSheet extends StatelessWidget {
   }
 }
 
-class _FilterOptionChip extends StatelessWidget {
+class _FilterChip extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _FilterOptionChip({
+  const _FilterChip({
     required this.label,
     required this.isActive,
     required this.onTap,

@@ -7,6 +7,7 @@ import '../services/notifications_service.dart';
 import 'my_purchases.dart';
 
 enum _DeliveryOption { campusPickup, delivery }
+
 enum _ContactMethod { whatsapp, inApp }
 
 class CompletePurchasePage extends StatefulWidget {
@@ -47,100 +48,118 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
 
     final product = widget.product;
     final buyer = widget.currentUser;
+    // Prevent providers and admins from placing orders
+    if (buyer.role == 'provider' || buyer.role == 'admin') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Providers and Admins cannot place orders.'),
+        ),
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
     final totalPrice = _totalPrice;
-    final deliveryOption =
-        _selectedDelivery == _DeliveryOption.campusPickup ? 'Campus Pickup' : 'Delivery';
-    final deliveryFeeLabel =
-        _selectedDelivery == _DeliveryOption.campusPickup ? 'Free' : 'By seller';
-    final contactMethod =
-        _selectedContact == _ContactMethod.whatsapp ? 'WhatsApp' : 'In-App Messaging';
+    final deliveryOption = _selectedDelivery == _DeliveryOption.campusPickup
+        ? 'Campus Pickup'
+        : 'Delivery';
+    final deliveryFeeLabel = _selectedDelivery == _DeliveryOption.campusPickup
+        ? 'Free'
+        : 'By seller';
+    final contactMethod = _selectedContact == _ContactMethod.whatsapp
+        ? 'WhatsApp'
+        : 'In-App Messaging';
 
-      try {
-        final orderRef = FirebaseFirestore.instance.collection('orders').doc();
-        await orderRef.set({
-          'orderId': orderRef.id,
-          'productId': product.productId,
-          'productTitle': product.title.trim(),
-          'category': product.category.trim(),
-          'productDescription': product.description.trim(),
-          'location': product.location.trim(),
-          'specificLocation': product.specificLocation.trim(),
-          'video': product.video,
-          'primaryImage': product.primaryImage,
-          'images': product.images,
-          'unitPrice': product.price,
-          'quantity': _quantity,
-          'totalPrice': totalPrice,
-          'price': totalPrice,
-          'currency': 'Tsh',
-          'buyerId': buyer.uid,
-          'buyerName': buyer.fullName.trim(),
-          'buyerEmail': buyer.email.trim().toLowerCase(),
-          'sellerId': product.sellerId,
-          'sellerName': product.sellerName.trim(),
-          'sellerEmail': product.sellerEmail.trim().toLowerCase(),
-          'paymentMethod': 'Cash on Delivery',
-          'deliveryOption': deliveryOption,
-          'deliveryFeeLabel': deliveryFeeLabel,
-          'contactMethod': contactMethod,
-          'status': 'pending',
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+    try {
+      final orderRef = FirebaseFirestore.instance.collection('orders').doc();
+      await orderRef.set({
+        'orderId': orderRef.id,
+        'productId': product.productId,
+        'productTitle': product.title.trim(),
+        'category': product.category.trim(),
+        'productDescription': product.description.trim(),
+        'location': product.location.trim(),
+        'specificLocation': product.specificLocation.trim(),
+        'video': product.video,
+        'primaryImage': product.primaryImage,
+        'images': product.images,
+        'unitPrice': product.price,
+        'quantity': _quantity,
+        'totalPrice': totalPrice,
+        'price': totalPrice,
+        'currency': 'Tsh',
+        'buyerId': buyer.uid,
+        'buyerName': buyer.fullName.trim(),
+        'buyerEmail': buyer.email.trim().toLowerCase(),
+        'sellerId': product.sellerId,
+        'sellerName': product.sellerName.trim(),
+        'sellerEmail': product.sellerEmail.trim().toLowerCase(),
+        'paymentMethod': 'Cash on Delivery',
+        'deliveryOption': deliveryOption,
+        'deliveryFeeLabel': deliveryFeeLabel,
+        'contactMethod': contactMethod,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-        await _notificationsService.createNotification(
-          userId: buyer.uid,
-          title: 'Order Placed',
-          message:
-              'You placed an order for "${product.title.trim()}". Waiting for seller confirmation.',
-          type: 'order_placed',
-          orderId: orderRef.id,
-        );
-        await _notificationsService.createNotification(
-          userId: product.sellerId,
-          title: 'New Order',
-          message:
-              '${buyer.fullName.trim()} placed an order for "${product.title.trim()}".',
-          type: 'order_received',
-          orderId: orderRef.id,
-        );
+      await _notificationsService.createNotification(
+        userId: buyer.uid,
+        title: 'Order Placed',
+        message:
+            'You placed an order for "${product.title.trim()}". Waiting for seller confirmation.',
+        type: 'order_placed',
+        orderId: orderRef.id,
+      );
+      await _notificationsService.createNotification(
+        userId: product.sellerId,
+        title: 'New Order',
+        message:
+            '${buyer.fullName.trim()} placed an order for "${product.title.trim()}".',
+        type: 'order_received',
+        orderId: orderRef.id,
+      );
 
-        if (!mounted) return;
-        
-        // Show success dialog with options
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Purchase Confirmed!'),
-            content: const Text('Your purchase request has been submitted successfully.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => MyPurchasesPage(user: buyer)),
-                    (route) => route.isFirst,
-                  );
-                },
-                child: const Text('Go to My Orders'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(); // Go back to previous screen
-                },
-                child: const Text('Back to Home'),
-              ),
-            ],
+      if (!mounted) return;
+
+      // Show success dialog with options
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Purchase Confirmed!'),
+          content: const Text(
+            'Your purchase request has been submitted successfully.',
           ),
-        );
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit purchase request.')),
-        );
-        setState(() => _isSubmitting = false);
-      }
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => MyPurchasesPage(user: buyer),
+                  ),
+                  (route) => route.isFirst,
+                );
+              },
+              child: const Text('Go to My Orders'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Go back to previous screen
+              },
+              child: const Text('Back to Home'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to submit purchase request.')),
+      );
+      setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -148,7 +167,10 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
     final product = widget.product;
     final itemPrice = _formatTsh(product.price);
     final totalPrice = _formatTsh(_totalPrice);
-    final confirmEnabled = _agreeTerms && !_isSubmitting;
+    final canPurchase =
+        widget.currentUser.role != 'provider' &&
+        widget.currentUser.role != 'admin';
+    final confirmEnabled = _agreeTerms && !_isSubmitting && canPurchase;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
@@ -168,11 +190,17 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Item Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Item Summary',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Row(
                     children: [
                       ClipRRect(
@@ -183,9 +211,14 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                           child: product.images.isEmpty
                               ? Container(
                                   color: const Color(0xFFE6E6E6),
-                                  child: const Icon(Icons.image_not_supported_outlined),
+                                  child: const Icon(
+                                    Icons.image_not_supported_outlined,
+                                  ),
                                 )
-                              : Image.network(product.images.first, fit: BoxFit.cover),
+                              : Image.network(
+                                  product.images.first,
+                                  fit: BoxFit.cover,
+                                ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -193,13 +226,33 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                            Text(
+                              product.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text(itemPrice, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF1E88E5))),
+                            Text(
+                              itemPrice,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1E88E5),
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
-                              product.sellerName.trim().isEmpty ? 'Unknown seller' : product.sellerName.trim(),
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF696969)),
+                              product.sellerName.trim().isEmpty
+                                  ? 'Unknown seller'
+                                  : product.sellerName.trim(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF696969),
+                              ),
                             ),
                             const SizedBox(height: 8),
                             _QuantityStepper(
@@ -214,7 +267,10 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                const Text('Delivery Option', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Delivery Option',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -224,8 +280,12 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         subtitle: 'Arrange to meet the seller on campus',
                         footer: 'Free',
                         icon: Icons.store_mall_directory_outlined,
-                        selected: _selectedDelivery == _DeliveryOption.campusPickup,
-                        onTap: () => setState(() => _selectedDelivery = _DeliveryOption.campusPickup),
+                        selected:
+                            _selectedDelivery == _DeliveryOption.campusPickup,
+                        onTap: () => setState(
+                          () =>
+                              _selectedDelivery = _DeliveryOption.campusPickup,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -236,13 +296,18 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                         footer: 'Determined by seller',
                         icon: Icons.local_shipping_outlined,
                         selected: _selectedDelivery == _DeliveryOption.delivery,
-                        onTap: () => setState(() => _selectedDelivery = _DeliveryOption.delivery),
+                        onTap: () => setState(
+                          () => _selectedDelivery = _DeliveryOption.delivery,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 22),
-                const Text('Payment Method', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Payment Method',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 _OptionCard(
                   title: 'Pay with Cash',
@@ -253,27 +318,39 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   onTap: () {},
                 ),
                 const SizedBox(height: 22),
-                const Text('Contact Method', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Contact Method',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 _ChoiceTile(
                   title: 'WhatsApp',
                   icon: Icons.chat_bubble_outline_rounded,
                   selected: _selectedContact == _ContactMethod.whatsapp,
-                  onTap: () => setState(() => _selectedContact = _ContactMethod.whatsapp),
+                  onTap: () => setState(
+                    () => _selectedContact = _ContactMethod.whatsapp,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 _ChoiceTile(
                   title: 'In-App Messaging',
                   icon: Icons.message_outlined,
                   selected: _selectedContact == _ContactMethod.inApp,
-                  onTap: () => setState(() => _selectedContact = _ContactMethod.inApp),
+                  onTap: () =>
+                      setState(() => _selectedContact = _ContactMethod.inApp),
                 ),
                 const SizedBox(height: 22),
-                const Text('Order Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Order Summary',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Column(
                     children: [
                       _SummaryRow(label: 'Item Price', value: itemPrice),
@@ -282,13 +359,19 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                       const SizedBox(height: 8),
                       _SummaryRow(
                         label: 'Delivery Fee',
-                        value: _selectedDelivery == _DeliveryOption.campusPickup ? 'Free' : 'By seller',
+                        value: _selectedDelivery == _DeliveryOption.campusPickup
+                            ? 'Free'
+                            : 'By seller',
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Divider(height: 1),
                       ),
-                      _SummaryRow(label: 'Total Amount', value: totalPrice, emphasize: true),
+                      _SummaryRow(
+                        label: 'Total Amount',
+                        value: totalPrice,
+                        emphasize: true,
+                      ),
                     ],
                   ),
                 ),
@@ -298,20 +381,28 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                   onTap: () => setState(() => _agreeTerms = !_agreeTerms),
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Checkbox(
                           value: _agreeTerms,
-                          onChanged: (value) => setState(() => _agreeTerms = value ?? false),
+                          onChanged: (value) =>
+                              setState(() => _agreeTerms = value ?? false),
                           activeColor: const Color(0xFF2F65FF),
                         ),
                         const SizedBox(width: 4),
                         const Expanded(
                           child: Text(
                             'I agree to the Terms & Conditions and understand that this initiates a purchase request.',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF4E4E4E), height: 1.35),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF4E4E4E),
+                              height: 1.35,
+                            ),
                           ),
                         ),
                       ],
@@ -327,7 +418,10 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
             bottom: 0,
             child: Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey.shade300))),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Colors.grey.shade300)),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -340,24 +434,35 @@ class _CompletePurchasePageState extends State<CompletePurchasePage> {
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Icon(Icons.lock_outline_rounded),
                       label: Text('Confirm Purchase - $totalPrice'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: confirmEnabled ? const Color(0xFF2F65FF) : const Color(0xFFD0D0D0),
+                        backgroundColor: confirmEnabled
+                            ? const Color(0xFF2F65FF)
+                            : const Color(0xFFD0D0D0),
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: const Color(0xFFD0D0D0),
                         disabledForegroundColor: Colors.white70,
                         elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Secure transaction • Your order is protected',
-                    style: TextStyle(color: Color(0xFF7A7A7A), fontSize: 13, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Color(0xFF7A7A7A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -468,7 +573,9 @@ class _OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected ? const Color(0xFF2F65FF) : const Color(0xFFE5E5E5);
+    final borderColor = selected
+        ? const Color(0xFF2F65FF)
+        : const Color(0xFFE5E5E5);
     final bgColor = selected ? const Color(0xFFF1F6FF) : Colors.white;
 
     return InkWell(
@@ -489,18 +596,29 @@ class _OptionCard extends StatelessWidget {
                 Icon(icon, size: 17, color: const Color(0xFF5A5A5A)),
                 const Spacer(),
                 Icon(
-                  selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                  color: selected ? const Color(0xFF2F65FF) : const Color(0xFFBDBDBD),
+                  selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_off,
+                  color: selected
+                      ? const Color(0xFF2F65FF)
+                      : const Color(0xFFBDBDBD),
                   size: 17,
                 ),
               ],
             ),
             const SizedBox(height: 7),
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF666666), height: 1.3),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF666666),
+                height: 1.3,
+              ),
             ),
             if (footer.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -543,18 +661,34 @@ class _ChoiceTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? const Color(0xFF2F65FF) : const Color(0xFFE5E5E5)),
+          border: Border.all(
+            color: selected ? const Color(0xFF2F65FF) : const Color(0xFFE5E5E5),
+          ),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 19, color: selected ? const Color(0xFF2F65FF) : const Color(0xFF6D6D6D)),
+            Icon(
+              icon,
+              size: 19,
+              color: selected
+                  ? const Color(0xFF2F65FF)
+                  : const Color(0xFF6D6D6D),
+            ),
             const SizedBox(width: 9),
             Expanded(
-              child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             Icon(
               selected ? Icons.check_circle : Icons.radio_button_unchecked,
-              color: selected ? const Color(0xFF2ECC71) : const Color(0xFFBDBDBD),
+              color: selected
+                  ? const Color(0xFF2ECC71)
+                  : const Color(0xFFBDBDBD),
               size: 19,
             ),
           ],
