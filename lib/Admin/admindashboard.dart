@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../account_settings.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
+import '../services/notifications_service.dart';
 import '../signin.dart';
 import 'manage_ads.dart';
 import 'manage_listings.dart';
@@ -24,7 +25,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   bool _isUserLoading = true;
   bool _isFetchingNotifications = false;
   bool _isLoadingAdminSummary = true;
+  bool _hasViewedAdminAlerts = false;
   _AdminNotificationSummary _adminSummary = _AdminNotificationSummary.empty();
+
+  int get _appBarNotificationBadgeCount {
+    if (_hasViewedAdminAlerts) return 0;
+    return _adminSummary.totalNewUpdates;
+  }
 
   @override
   void initState() {
@@ -49,7 +56,19 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _adminSummary = summary;
       _isLoadingAdminSummary = false;
+      _hasViewedAdminAlerts = true;
     });
+
+    final userId = _currentUser?.uid.trim().isNotEmpty == true
+        ? _currentUser!.uid.trim()
+        : 'system_admin';
+    try {
+      await NotificationsService().markAllAsRead(userId);
+    } catch (_) {
+      // The admin summary has already been viewed; Firestore read-state should
+      // not block the alerts dialog.
+    }
+    if (!mounted) return;
 
     showDialog<void>(
       context: context,
@@ -259,6 +278,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     setState(() {
       _adminSummary = summary;
       _isLoadingAdminSummary = false;
+      _hasViewedAdminAlerts = false;
     });
   }
 
@@ -318,8 +338,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               clipBehavior: Clip.none,
               children: [
                 const Icon(Icons.notifications_rounded, color: Colors.black54),
-                if (!_isLoadingAdminSummary &&
-                    _adminSummary.totalNewUpdates > 0)
+                if (!_isLoadingAdminSummary && _appBarNotificationBadgeCount > 0)
                   Positioned(
                     top: -2,
                     right: -2,
@@ -333,9 +352,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _adminSummary.totalNewUpdates > 9
+                        _appBarNotificationBadgeCount > 9
                             ? '9+'
-                            : '${_adminSummary.totalNewUpdates}',
+                            : '$_appBarNotificationBadgeCount',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
@@ -462,7 +481,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.groups_rounded,
                     label: 'Users',
-                    badgeCount: _adminSummary.newUserCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -475,7 +493,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.notifications_active_rounded,
                     label: 'Notifications',
-                    badgeCount: _adminSummary.totalNewUpdates,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -488,7 +505,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.campaign_rounded,
                     label: 'Ads',
-                    badgeCount: _adminSummary.newAdsCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -501,7 +517,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     collapsed: _isCollapsed,
                     icon: Icons.storefront_rounded,
                     label: 'Marketplace',
-                    badgeCount: _adminSummary.newListingCount,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -927,14 +942,12 @@ class _SidebarItem extends StatelessWidget {
   final bool collapsed;
   final IconData icon;
   final String label;
-  final int badgeCount;
   final VoidCallback? onTap;
 
   const _SidebarItem({
     required this.collapsed,
     required this.icon,
     required this.label,
-    this.badgeCount = 0,
     this.onTap,
   });
 
@@ -954,50 +967,18 @@ class _SidebarItem extends StatelessWidget {
               final showLabel = constraints.maxWidth >= 120;
               if (!showLabel) {
                 return Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDEBFF),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          icon,
-                          color: const Color(0xFF4A3DE0),
-                          size: 22,
-                        ),
-                      ),
-                      if (badgeCount > 0)
-                        Positioned(
-                          top: -4,
-                          right: -4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 1.8,
-                              ),
-                            ),
-                            child: Text(
-                              badgeCount > 9 ? '9+' : '$badgeCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDEBFF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: const Color(0xFF4A3DE0),
+                      size: 22,
+                    ),
                   ),
                 );
               }
@@ -1021,26 +1002,6 @@ class _SidebarItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (badgeCount > 0)
-                    Container(
-                      margin: const EdgeInsets.only(left: 6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        badgeCount > 9 ? '9+' : '$badgeCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
                 ],
               );
             },

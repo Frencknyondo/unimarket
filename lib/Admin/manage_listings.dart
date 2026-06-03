@@ -47,18 +47,241 @@ class _ManageListingsPageState extends State<ManageListingsPage> {
     }
   }
 
-  void _editListing(ProductListing listing) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Edit: ${listing.title}')));
+  Future<void> _editListing(ProductListing listing) async {
+    final titleController = TextEditingController(text: listing.title);
+    final priceController = TextEditingController(
+      text: listing.price.toStringAsFixed(0),
+    );
+    final categoryController = TextEditingController(text: listing.category);
+    final locationController = TextEditingController(text: listing.location);
+    final specificLocationController = TextEditingController(
+      text: listing.specificLocation,
+    );
+    final descriptionController = TextEditingController(
+      text: listing.description,
+    );
+    final imageUrlsController = TextEditingController(
+      text: listing.images.join('\n'),
+    );
+    final videoUrlController = TextEditingController(text: listing.video ?? '');
+    var isSaving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> saveListing() async {
+              final price = double.tryParse(priceController.text.trim());
+              if (titleController.text.trim().isEmpty ||
+                  categoryController.text.trim().isEmpty ||
+                  locationController.text.trim().isEmpty ||
+                  descriptionController.text.trim().isEmpty ||
+                  price == null) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Fill all required fields')),
+                );
+                return;
+              }
+
+              final images = imageUrlsController.text
+                  .split('\n')
+                  .map((url) => url.trim())
+                  .where((url) => url.isNotEmpty)
+                  .toList();
+
+              setSheetState(() => isSaving = true);
+              try {
+                await FirebaseFirestore.instance
+                    .collection('listings')
+                    .doc(listing.productId)
+                    .set({
+                      'title': titleController.text.trim(),
+                      'title_lower': titleController.text.trim().toLowerCase(),
+                      'price': price,
+                      'currency': listing.currency,
+                      'category': categoryController.text.trim(),
+                      'location': locationController.text.trim(),
+                      'specificLocation': specificLocationController.text
+                          .trim(),
+                      'description': descriptionController.text.trim(),
+                      'imageUrls': images,
+                      'images': images,
+                      'videoUrl': videoUrlController.text.trim().isEmpty
+                          ? null
+                          : videoUrlController.text.trim(),
+                      'updatedAt': FieldValue.serverTimestamp(),
+                      'keywords': _buildSearchKeywords(
+                        title: titleController.text.trim(),
+                        category: categoryController.text.trim(),
+                        location: locationController.text.trim(),
+                        specificLocation: specificLocationController.text
+                            .trim(),
+                      ),
+                    }, SetOptions(merge: true));
+
+                if (!mounted || !sheetContext.mounted) return;
+                Navigator.of(sheetContext).pop();
+                await _loadListings();
+                if (!mounted) return;
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Listing updated successfully')),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(content: Text('Error updating listing: $e')),
+                );
+              } finally {
+                if (mounted) setSheetState(() => isSaving = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Edit Listing',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _AdminTextField(controller: titleController, label: 'Title'),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: priceController,
+                      label: 'Price',
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: categoryController,
+                      label: 'Category',
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: locationController,
+                      label: 'Location',
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: specificLocationController,
+                      label: 'Specific location',
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: descriptionController,
+                      label: 'Description',
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: imageUrlsController,
+                      label: 'Image URLs, one per line',
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 12),
+                    _AdminTextField(
+                      controller: videoUrlController,
+                      label: 'Video URL',
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: isSaving ? null : saveListing,
+                        icon: isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save_rounded),
+                        label: Text(isSaving ? 'Saving...' : 'Save Changes'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A3DE0),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    titleController.dispose();
+    priceController.dispose();
+    categoryController.dispose();
+    locationController.dispose();
+    specificLocationController.dispose();
+    descriptionController.dispose();
+    imageUrlsController.dispose();
+    videoUrlController.dispose();
   }
 
-  void _deleteListing(String id) async {
+  Future<void> _deleteListing(ProductListing listing) async {
+    final shouldDelete =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete Listing'),
+            content: Text('Delete "${listing.title}" permanently?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) return;
+
     try {
-      await FirebaseFirestore.instance.collection('listings').doc(id).delete();
+      await FirebaseFirestore.instance
+          .collection('listings')
+          .doc(listing.productId)
+          .delete();
       if (!mounted) return;
       setState(() {
-        listings.removeWhere((item) => item.productId == id);
+        listings.removeWhere((item) => item.productId == listing.productId);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Listing deleted successfully')),
@@ -69,6 +292,41 @@ class _ManageListingsPageState extends State<ManageListingsPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error deleting listing: $e')));
     }
+  }
+
+  List<String> _buildSearchKeywords({
+    required String title,
+    required String category,
+    required String location,
+    required String specificLocation,
+  }) {
+    final normalized = <String>{};
+
+    void addWordAndPrefixes(String value) {
+      final tokens = value
+          .toLowerCase()
+          .trim()
+          .split(RegExp(r'[\s,.-]+'))
+          .where((token) => token.isNotEmpty);
+
+      for (final token in tokens) {
+        normalized.add(token);
+        for (var length = 2; length <= token.length; length++) {
+          normalized.add(token.substring(0, length));
+        }
+      }
+    }
+
+    normalized.add(title.toLowerCase().trim());
+    normalized.add(category.toLowerCase().trim());
+    normalized.add(location.toLowerCase().trim());
+    normalized.add(specificLocation.toLowerCase().trim());
+    addWordAndPrefixes(title);
+    addWordAndPrefixes(category);
+    addWordAndPrefixes(location);
+    addWordAndPrefixes(specificLocation);
+
+    return normalized.toList();
   }
 
   @override
@@ -95,7 +353,7 @@ class _ManageListingsPageState extends State<ManageListingsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Active Listings',
+                            'All Listings',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -114,8 +372,7 @@ class _ManageListingsPageState extends State<ManageListingsPage> {
                               return _ListingCard(
                                 listing: listing,
                                 onEdit: () => _editListing(listing),
-                                onDelete: () =>
-                                    _deleteListing(listing.productId),
+                                onDelete: () => _deleteListing(listing),
                               );
                             },
                           ),
@@ -123,6 +380,42 @@ class _ManageListingsPageState extends State<ManageListingsPage> {
                       ),
                     ),
             ),
+    );
+  }
+}
+
+class _AdminTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+  final int maxLines;
+
+  const _AdminTextField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+    this.maxLines = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: const Color(0xFFF7F7F7),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF4A3DE0), width: 1.2),
+        ),
+      ),
     );
   }
 }

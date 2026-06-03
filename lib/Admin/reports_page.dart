@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../models/order_model.dart';
 import '../models/product_listing.dart';
 
@@ -139,10 +142,212 @@ class _ReportsPageState extends State<ReportsPage> {
     return months[month - 1];
   }
 
-  void _exportToPDF() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('PDF export coming soon...')));
+  Future<void> _exportToPDF() async {
+    if (isLoading) return;
+
+    try {
+      final pdf = pw.Document();
+      final generatedAt = DateTime.now();
+      final topCategories = _getTopCategories();
+      final priceDistribution = _getHighestPriced();
+      final recentOrders = orders.take(12).toList();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          build: (context) => [
+            _pdfHeader(generatedAt),
+            pw.SizedBox(height: 18),
+            pw.Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _pdfMetric('Total Listings', listings.length.toString()),
+                _pdfMetric('Total Orders', orders.length.toString()),
+                _pdfMetric(
+                  'Revenue',
+                  'Tsh ${_calculateRevenue().toStringAsFixed(0)}',
+                ),
+                _pdfMetric('Categories', _getCategoryCount().toString()),
+              ],
+            ),
+            pw.SizedBox(height: 24),
+            _pdfSectionTitle('Top Categories'),
+            _pdfBreakdownTable(topCategories),
+            pw.SizedBox(height: 18),
+            _pdfSectionTitle('Price Distribution'),
+            _pdfBreakdownTable(priceDistribution),
+            pw.SizedBox(height: 18),
+            _pdfSectionTitle('Recent Orders'),
+            if (recentOrders.isEmpty)
+              pw.Text('No orders available.')
+            else
+              pw.TableHelper.fromTextArray(
+                border: null,
+                headerDecoration: const pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xFFEEF2FF),
+                ),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                cellPadding: const pw.EdgeInsets.all(7),
+                headers: const [
+                  'Date',
+                  'Product',
+                  'Buyer',
+                  'Status',
+                  'Amount',
+                ],
+                data: recentOrders
+                    .map(
+                      (order) => [
+                        _formatDate(order.createdAt),
+                        order.productTitle,
+                        order.buyerName.isEmpty ? order.buyerEmail : order.buyerName,
+                        order.status.toUpperCase(),
+                        '${order.currency} ${order.totalPrice.toStringAsFixed(0)}',
+                      ],
+                    )
+                    .toList(),
+              ),
+            pw.SizedBox(height: 18),
+            _pdfSectionTitle('Report Notes'),
+            pw.Text(
+              'This report was generated from the current Firestore orders and listings data. It summarizes marketplace activity, revenue, category mix, and recent transactions for admin review.',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+            ),
+          ],
+          footer: (context) => pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'UniMarket Admin Report - Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+            ),
+          ),
+        ),
+      );
+
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename: 'unimarket-report-${_fileDate(generatedAt)}.pdf',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to export PDF: $e')));
+    }
+  }
+
+  pw.Widget _pdfHeader(DateTime generatedAt) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(18),
+      decoration: pw.BoxDecoration(
+        color: const PdfColor.fromInt(0xFF1F2937),
+        borderRadius: pw.BorderRadius.circular(10),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                'UniMarket Admin Report',
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 22,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                'Marketplace performance and management summary',
+                style: const pw.TextStyle(color: PdfColors.grey300),
+              ),
+            ],
+          ),
+          pw.Text(
+            _formatDate(generatedAt),
+            style: pw.TextStyle(
+              color: PdfColors.white,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfMetric(String title, String value) {
+    return pw.Container(
+      width: 125,
+      padding: const pw.EdgeInsets.all(12),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            title,
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _pdfSectionTitle(String title) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Text(
+        title,
+        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+      ),
+    );
+  }
+
+  pw.Widget _pdfBreakdownTable(List<(String, int, double)> items) {
+    if (items.isEmpty) return pw.Text('No data available.');
+    return pw.TableHelper.fromTextArray(
+      border: null,
+      headerDecoration: const pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFFEEF2FF),
+      ),
+      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+      cellStyle: const pw.TextStyle(fontSize: 10),
+      cellPadding: const pw.EdgeInsets.all(8),
+      headers: const ['Name', 'Count', 'Percentage'],
+      data: items
+          .map(
+            (item) => [
+              item.$1,
+              item.$2.toString(),
+              '${item.$3.toStringAsFixed(1)}%',
+            ],
+          )
+          .toList(),
+    );
+  }
+
+  String _formatDate(DateTime? value) {
+    if (value == null) return '-';
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    return '$day/$month/${value.year}';
+  }
+
+  String _fileDate(DateTime value) {
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    return '${value.year}-$month-$day';
   }
 
   @override
