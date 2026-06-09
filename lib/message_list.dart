@@ -7,6 +7,7 @@ import 'home.dart';
 import 'layout/provider_bottom_nav.dart';
 import 'layout/student_bottom_nav.dart';
 import 'models/user_model.dart';
+import 'services/presence_service.dart';
 
 Widget _buildUserAvatar(User user, {double radius = 24}) {
   final picture = user.profilePicture?.trim();
@@ -287,6 +288,7 @@ class _ChatConversationPageState extends State<ChatConversationPage>
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final _messageService = _MessageService();
+  final _presenceService = PresenceService();
   bool _isSending = false;
 
   @override
@@ -362,66 +364,70 @@ class _ChatConversationPageState extends State<ChatConversationPage>
           stream: _messageService.userStream(widget.peerUser.uid),
           builder: (context, snapshot) {
             final peer = snapshot.data ?? widget.peerUser;
-            final presence = _PresenceInfo.fromUser(peer);
-
-            return Row(
-              children: [
-                Stack(
+            return StreamBuilder<PresenceStatus?>(
+              stream: _presenceService.statusStream(widget.peerUser.uid),
+              builder: (context, statusSnapshot) {
+                final presence = _PresenceInfo.fromStatus(statusSnapshot.data);
+                return Row(
                   children: [
-                    _buildUserAvatar(peer, radius: 22),
-                    Positioned(
-                      right: 1,
-                      bottom: 1,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: presence.isOnline
-                              ? const Color(0xFF22C55E)
-                              : const Color(0xFF94A3B8),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: const Color(0xFFF3F6FF),
-                            width: 2,
+                    Stack(
+                      children: [
+                        _buildUserAvatar(peer, radius: 22),
+                        Positioned(
+                          right: 1,
+                          bottom: 1,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: presence.isOnline
+                                  ? const Color(0xFF22C55E)
+                                  : const Color(0xFF94A3B8),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFF3F6FF),
+                                width: 2,
+                              ),
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            peer.fullName.trim().isEmpty
+                                ? 'Unknown user'
+                                : peer.fullName.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF1F285C),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            presence.label,
+                            style: TextStyle(
+                              color: presence.isOnline
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFF7B87B7),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        peer.fullName.trim().isEmpty
-                            ? 'Unknown user'
-                            : peer.fullName.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF1F285C),
-                          fontWeight: FontWeight.w800,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        presence.label,
-                        style: TextStyle(
-                          color: presence.isOnline
-                              ? const Color(0xFF16A34A)
-                              : const Color(0xFF7B87B7),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                );
+              },
             );
           },
         ),
@@ -1006,6 +1012,25 @@ class _PresenceInfo {
       label: 'Last seen ${_formatLastSeen(lastSeen)}',
     );
   }
+
+  factory _PresenceInfo.fromStatus(PresenceStatus? status) {
+    if (status == null) {
+      return const _PresenceInfo(isOnline: false, label: 'Offline');
+    }
+
+    if (status.isOnline) {
+      return const _PresenceInfo(isOnline: true, label: 'Online now');
+    }
+
+    if (status.lastSeen == null) {
+      return const _PresenceInfo(isOnline: false, label: 'Offline');
+    }
+
+    return _PresenceInfo(
+      isOnline: false,
+      label: 'Last seen ${_formatLastSeen(status.lastSeen!)}',
+    );
+  }
 }
 
 class _MessageService {
@@ -1138,6 +1163,14 @@ class _MessageService {
     required bool isOnline,
   }) async {
     if (userId.trim().isEmpty) return;
+
+    if (isOnline) {
+      await PresenceService().initializePresence(userId);
+      await PresenceService().setOnline();
+    } else {
+      await PresenceService().setOffline();
+    }
+
     await _firestore.collection(_usersCollection).doc(userId).set({
       'isOnline': isOnline,
       'lastSeenAt': FieldValue.serverTimestamp(),
