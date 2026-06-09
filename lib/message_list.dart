@@ -114,6 +114,7 @@ class _MessageListPageState extends State<MessageListPage>
     });
 
     return Scaffold(
+      extendBody: true,
       backgroundColor: const Color(0xFFF3F6FF),
       bottomNavigationBar: isProvider
           ? ProviderBottomNav(
@@ -238,19 +239,25 @@ class _MessageListPageState extends State<MessageListPage>
                                     createdAt: DateTime.now(),
                                   );
 
-                              return _ConversationTile(
-                                thread: thread,
-                                peerUser: displayUser,
-                                currentUserId: widget.currentUser.uid,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => ChatConversationPage(
-                                        currentUser: widget.currentUser,
-                                        peerUser: displayUser,
-                                        chatId: thread.id,
-                                      ),
-                                    ),
+                              return StreamBuilder<PresenceStatus?>(
+                                stream: PresenceService().statusStream(peerId),
+                                builder: (context, presenceSnapshot) {
+                                  return _ConversationTile(
+                                    thread: thread,
+                                    peerUser: displayUser,
+                                    presenceStatus: presenceSnapshot.data,
+                                    currentUserId: widget.currentUser.uid,
+                                    onTap: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatConversationPage(
+                                            currentUser: widget.currentUser,
+                                            peerUser: displayUser,
+                                            chatId: thread.id,
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   );
                                 },
                               );
@@ -354,6 +361,7 @@ class _ChatConversationPageState extends State<ChatConversationPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       backgroundColor: const Color(0xFFF3F6FF),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF3F6FF),
@@ -655,19 +663,23 @@ class _ChatConversationPageState extends State<ChatConversationPage>
 class _ConversationTile extends StatelessWidget {
   final _ChatThread thread;
   final User peerUser;
+  final PresenceStatus? presenceStatus;
   final String currentUserId;
   final VoidCallback onTap;
 
   const _ConversationTile({
     required this.thread,
     required this.peerUser,
+    this.presenceStatus,
     required this.currentUserId,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final presence = _PresenceInfo.fromUser(peerUser);
+    final presence = presenceStatus != null
+        ? _PresenceInfo.fromStatus(presenceStatus)
+        : _PresenceInfo.fromUser(peerUser);
     final unreadCount = thread.unreadCountFor(currentUserId);
 
     return Material(
@@ -691,14 +703,15 @@ class _ConversationTile extends StatelessWidget {
           child: Row(
             children: [
               Stack(
+                clipBehavior: Clip.none,
                 children: [
                   _buildUserAvatar(peerUser, radius: 24),
                   Positioned(
-                    right: 2,
-                    bottom: 2,
+                    right: -1,
+                    bottom: -1,
                     child: Container(
-                      width: 11,
-                      height: 11,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: presence.isOnline
                             ? const Color(0xFF22C55E)
